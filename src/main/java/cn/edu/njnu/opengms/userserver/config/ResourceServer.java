@@ -8,9 +8,17 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.R
 @Configuration
 @EnableResourceServer
 public class ResourceServer extends ResourceServerConfigurerAdapter {
+    /**
+     * 配置接口安全配置
+     * @param http
+     * @throws Exception
+     */
     @Override
     public void configure(HttpSecurity http) throws Exception {
         http.authorizeRequests()
+                .antMatchers("/avatar/**").permitAll()
+                .antMatchers("/user/**").permitAll()
                 .anyRequest().authenticated();
     }
+
 }

@@ -6,6 +6,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.DigestUtils;
 
+/**
+ * 废弃，用户服务器不对密码进行加密操作
+ */
 public class Md5PasswordEncoder implements PasswordEncoder {
     private final Log logger = LogFactory.getLog(getClass());
 

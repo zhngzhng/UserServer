@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
@@ -20,9 +21,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         this.mongoTemplate = mongoTemplate;
     }
 
+    /**
+     * 设置 spring-security 验证的加密方式
+     * @return
+     */
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new Md5PasswordEncoder();
+    public PasswordEncoder passwordEncoder(){
+        return NoOpPasswordEncoder.getInstance();
     }
 
     //密码授权模式需要此方法

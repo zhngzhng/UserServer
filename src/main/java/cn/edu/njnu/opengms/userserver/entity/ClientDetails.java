@@ -19,4 +19,6 @@ public class ClientDetails {
     //设置用户是否自动 Approval 操作，默认为false，包括true,false,read,write.
     private String autoapprove;
     private String autoApproveScopes;
+    //是否支持refresh_token
+    private boolean supportRefreshToken;
 }
