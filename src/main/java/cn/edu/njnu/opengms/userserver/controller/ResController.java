@@ -64,6 +64,12 @@ public class ResController {
 
 
     //资源(文件夹)相关操作
+
+    @RequestMapping(value = "/res", method = RequestMethod.GET)
+    public JsonResult getAllFile(Principal principal){
+        return userService.getAllFileService(principal);
+    }
+
     @RequestMapping(value = "/res/{paths}", method = RequestMethod.POST)
     public JsonResult uploadRes(Principal principal, @RequestBody Resource resource, @PathVariable ArrayList<String> paths){
         return userService.addRes(principal, resource, paths);
@@ -81,6 +87,14 @@ public class ResController {
                              @RequestBody Resource resource,
                              @PathVariable("paths") ArrayList<String> paths){
         return userService.putRes(principal, resource, paths);
+    }
+
+    @RequestMapping(value = "/res/{newPaths}/{oldPaths}", method = RequestMethod.PUT)
+    public JsonResult changeFolder(Principal principal,
+                                   @RequestBody Resource resource,
+                                   @PathVariable("newPaths") ArrayList<String> newPaths,
+                                   @PathVariable("oldPaths") ArrayList<String> oldPaths){
+        return userService.changeFolder(principal, resource, oldPaths, newPaths);
     }
 
 

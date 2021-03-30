@@ -3,6 +3,7 @@ package cn.edu.njnu.opengms.userserver.config;
 import cn.edu.njnu.opengms.userserver.service.MongoClientDetailsService;
 import cn.edu.njnu.opengms.userserver.service.MongoUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
@@ -11,10 +12,14 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerSecurityConfigurer;
 import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
+import org.springframework.security.oauth2.provider.token.TokenEnhancer;
 import org.springframework.security.oauth2.provider.token.TokenEnhancerChain;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
 import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 @Configuration
 @EnableAuthorizationServer
@@ -31,6 +36,9 @@ public class AuthorizationServer extends AuthorizationServerConfigurerAdapter {
     TokenStore tokenStore;
     @Autowired
     JwtAccessTokenConverter jwtAccessTokenConverter;
+
+    @Autowired
+    TokenEnhancerImpl tokenEnhancer;
 
     /**
      * 配置 jwt tokenServices
@@ -58,9 +66,18 @@ public class AuthorizationServer extends AuthorizationServerConfigurerAdapter {
     public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
         endpoints.authenticationManager(authenticationManager);
         endpoints.userDetailsService(mongoUserDetails);
-        //配置 jwt-token
-        endpoints.accessTokenConverter(jwtAccessTokenConverter);
         endpoints.tokenStore(tokenStore);
+        //添加额外信息
+        if (jwtAccessTokenConverter != null && tokenEnhancer != null){
+            //使用enhancer 过滤链进行处理
+            TokenEnhancerChain tokenEnhancerChain = new TokenEnhancerChain();
+            ArrayList<TokenEnhancer> tokenEnhancersList = new ArrayList<>();
+            //需要注意顺序，先执行自定义 enhancer 添加信息，然后在加密
+            tokenEnhancersList.add(tokenEnhancer);
+            tokenEnhancersList.add(jwtAccessTokenConverter);
+            tokenEnhancerChain.setTokenEnhancers(tokenEnhancersList);
+            endpoints.tokenEnhancer(tokenEnhancerChain).accessTokenConverter(jwtAccessTokenConverter);
+        }
 
     }
 

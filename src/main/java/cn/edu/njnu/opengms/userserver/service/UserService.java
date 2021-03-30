@@ -39,5 +39,9 @@ public interface UserService {
 
     JsonResult putRes(Principal principal, Resource updateRes, ArrayList<String> paths);
 
+    JsonResult getAllFileService(Principal principal);
+
+    JsonResult changeFolder(Principal principal, Resource upRes, ArrayList<String> oldPaths, ArrayList<String> newPaths);
+
     // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
 }
