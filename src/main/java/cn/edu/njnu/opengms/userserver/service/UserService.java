@@ -31,8 +31,13 @@ public interface UserService {
 
     JsonResult addClientService(ClientDetails client);
 
+
     //文件夹结构相关内容
+    JsonResult addRes(Principal principal, Resource upRes, ArrayList<String> paths);
 
-    // JsonResult addFolder();
+    JsonResult delRes(Principal principal, String uid, ArrayList<String> paths);
 
+    JsonResult putRes(Principal principal, Resource updateRes, ArrayList<String> paths);
+
+    // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
 }

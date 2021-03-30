@@ -1,5 +1,6 @@
 package cn.edu.njnu.opengms.userserver.common;
 
+import cn.edu.njnu.opengms.userserver.entity.Resource;
 import cn.edu.njnu.opengms.userserver.entity.UserTitle;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import javax.mail.MessagingException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -61,7 +63,7 @@ public class CommonUtil {
         }
     }
 
-    public Update setUpdate(Map<String, Object> userInfoMap){
+    public Update setUpdate(Map<String, Object> userInfoMap) {
         Update update = new Update();
         try {
             for (Map.Entry<String, Object> entry : userInfoMap.entrySet()) {
@@ -85,18 +87,18 @@ public class CommonUtil {
                     case "avatar":
                         //新建文件夹
                         File path = new File(ResourceUtils.getURL("classpath:").getPath());
-                        if (!path.exists()){
+                        if (!path.exists()) {
                             path = new File("");
                         }
                         File avatarLocation = new File(path.getAbsolutePath(), "static/avatar/");
-                        if (!avatarLocation.exists()){
+                        if (!avatarLocation.exists()) {
                             avatarLocation.mkdirs();
                         }
                         String avatarId = UUID.randomUUID().toString();
                         File avatar = new File(path.getAbsolutePath(), "static/avatar/" + avatarId + ".jpg");
                         byte[] avatarBytes = new BASE64Decoder().decodeBuffer((String) value);
-                        for (int i=0; i < avatarBytes.length; i++){
-                            if (avatarBytes[i] < 0){
+                        for (int i = 0; i < avatarBytes.length; i++) {
+                            if (avatarBytes[i] < 0) {
                                 avatarBytes[i] += 256;
                             }
                         }
@@ -105,7 +107,7 @@ public class CommonUtil {
                         out.flush();
                         out.close();
 
-                        update.set(key,"/avatar/" + avatarId + ".jpg");
+                        update.set(key, "/avatar/" + avatarId + ".jpg");
                         break;
                     default:
                         update.set(key, (String) value);
@@ -113,8 +115,22 @@ public class CommonUtil {
             }
 
             return update;
-        }catch (IOException e){
+        } catch (IOException e) {
             return null;
         }
+    }
+
+    /**
+     * 通过 paths 查找资源应该存在的位置
+     * 找到父节点后直接在原文上修改得到内容
+     * @param paths
+     * @return
+     */
+    public ArrayList<Resource> findRes(ArrayList<String> paths) {
+        for (int i = 0; i < paths.size(); i++) {
+
+        }
+
+        return null;
     }
 }

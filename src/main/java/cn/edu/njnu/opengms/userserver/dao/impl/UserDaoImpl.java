@@ -96,7 +96,8 @@ public class UserDaoImpl implements UserDao {
             return ResultUtils.error(userObj.getMsg());
         }
         try {
-            if (mongoTemplate.updateFirst(query, update, User.class, COLLECTION_NAME).getModifiedCount() == 1) {
+            //upsert不会想update一样直接覆盖掉内容，会将新的内容更新上去
+            if (mongoTemplate.upsert(query, update, User.class, COLLECTION_NAME).getModifiedCount() == 1) {
                 User user = mongoTemplate.findOne(query, User.class, COLLECTION_NAME);
                 user.setPassword("");
                 return ResultUtils.success(user);
@@ -106,7 +107,6 @@ public class UserDaoImpl implements UserDao {
             return ResultUtils.error(e.toString());
         }
     }
-
 
     //验证码相关内容
 

@@ -57,25 +57,24 @@ public class UserServiceImpl implements UserService {
         String email = principal.getName();
         User user = (User) userDao.findUserById(email).getData();
         ArrayList<Resource> userRes = user.getResource();
-        if (userRes == null){
+        if (userRes == null) {
             userRes = new ArrayList<Resource>();
         }
         HashMap<String, Object> userInfoMap = new HashMap<>();
         switch (operationType) {
             case "push":
-                for (int i=0; i<resources.size(); i++){
+                for (int i = 0; i < resources.size(); i++) {
                     Resource resource = resources.get(i);
-                    resource.getParent();
                     userRes.add(resource);
                 }
                 break;
             case "update":
                 //具备批量修改功能
                 ArrayList<Integer> delTag = new ArrayList<Integer>();
-                for (int i=0; i < resources.size(); i++){
-                    for (int j =0; j<userRes.size(); j++){
+                for (int i = 0; i < resources.size(); i++) {
+                    for (int j = 0; j < userRes.size(); j++) {
                         //传输过来的res id与 userRes相同则记录
-                        if (resources.get(i).getUid().equals(userRes.get(j).getUid())){
+                        if (resources.get(i).getUid().equals(userRes.get(j).getUid())) {
                             delTag.add(j);
                             userRes.add(resources.get(i));
                             break;
@@ -84,8 +83,8 @@ public class UserServiceImpl implements UserService {
                 }
                 //对所匹配的序号进行排序，后续删除的时候通过-1
                 delTag.sort(Comparator.naturalOrder());
-                for (int index = 0; index < delTag.size(); index++){
-                    userRes.remove(delTag.get(index)-index);
+                for (int index = 0; index < delTag.size(); index++) {
+                    userRes.remove(delTag.get(index) - index);
                 }
                 break;
         }
@@ -99,12 +98,12 @@ public class UserServiceImpl implements UserService {
     @Override
     public JsonResult delRes(Principal principal, String[] uids) {
         String email = principal.getName();
-        User user =  (User)userDao.findUserById(email).getData();
+        User user = (User) userDao.findUserById(email).getData();
         ArrayList<Resource> resource = user.getResource();
         ArrayList<Integer> delTag = new ArrayList<Integer>();
-        for (int i=0; i < uids.length; i++){
-            for (int j =0; j<resource.size(); j++){
-                if (resource.get(j).getUid().equals(uids[i])){
+        for (int i = 0; i < uids.length; i++) {
+            for (int j = 0; j < resource.size(); j++) {
+                if (resource.get(j).getUid().equals(uids[i])) {
                     delTag.add(j);
                     break;
                 }
@@ -112,8 +111,8 @@ public class UserServiceImpl implements UserService {
         }
         //对所匹配的序号进行排序，后续删除的时候通过-1
         delTag.sort(Comparator.naturalOrder());
-        for (int index = 0; index < delTag.size(); index++){
-            resource.remove(delTag.get(index)-index);
+        for (int index = 0; index < delTag.size(); index++) {
+            resource.remove(delTag.get(index) - index);
         }
         HashMap<String, Object> userInfoMap = new HashMap<>();
         userInfoMap.put("resource", resource);
@@ -124,6 +123,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public JsonResult addUser(User user) {
         user.setUserId(UUID.randomUUID().toString());
+        if (user.getResource() == null){
+            user.setResource(new ArrayList<Resource>());
+        }
+        user.setCreatedTime(new Date());
         return userDao.createUser(user);
     }
 
@@ -221,5 +224,167 @@ public class UserServiceImpl implements UserService {
     @Override
     public JsonResult addClientService(ClientDetails client) {
         return userDao.addClient(client);
+    }
+
+
+    // public JsonResult addFolder(Principal principal, ArrayList<String> paths, String folderName, String privacy) {
+    //     String email = principal.getName();
+    //     User user = (User) userDao.findUserById(email).getData();
+    //     ArrayList<Resource> resource = user.getResource();
+    //     if (resource == null) {
+    //         resource = new ArrayList<Resource>();
+    //     }
+    //     Resource folder = new Resource();
+    //     folder.setFolder(true);
+    //     //根文件夹
+    //     if (paths.size() == 0) {
+    //         folder.setName(folderName);
+    //         folder.setPrivacy(privacy);
+    //         HashMap<String, Object> updateMap = new HashMap<>();
+    //         resource.add(folder);
+    //         updateMap.put("resource", resource);
+    //         Update update = commonUtil.setUpdate(updateMap);
+    //         return userDao.updateInfo(email, update);
+    //     }
+    //     //不是根文件夹则需要根据 path 搜索到具体位置然后新建文件夹
+    //     return null;
+    // }
+
+    /**
+     * 添加文件夹
+     * 文件夹也应该有私有或公有
+     * uid, date等内容都在各平台生成
+     * 文件夹在后台构建
+     *
+     * @param principal
+     * @param upRes
+     * @param paths
+     * @return
+     */
+    @Override
+    public JsonResult addRes(Principal principal, Resource upRes, ArrayList<String> paths) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        //初始化用于更新的内容 map
+        HashMap<String, Object> updateInfoMap = new HashMap<>();
+        // 为根节点情况，直接 push 即可,此情况作为递归出口了
+        // if (paths.size() == 0) {
+        //     userRes.add(upRes);
+        //     updateInfoMap.put("resource", userRes);
+        //     Update update = commonUtil.setUpdate(updateInfoMap);
+        //     return userDao.updateInfo(email, update);
+        // }
+        //不是根节点情况，需要按深度遍历获得父节点，然后将其 push 到父节点的 children 节点中
+        upRes.setChildren(new ArrayList<Resource>());
+        ArrayList<Resource> uploadedRes = aRes(paths, userRes, upRes, "0");
+        updateInfoMap.put("resource", uploadedRes);
+        Update update = commonUtil.setUpdate(updateInfoMap);
+        return userDao.updateInfo(email, update);
+    }
+
+    //遍历到父节点，然后将资源放进去
+    public ArrayList<Resource> aRes(ArrayList<String> paths, ArrayList<Resource> userRes, Resource upRes, String parent) {
+        // ”0“ 为根目录的指示，这也是为特殊情况准备
+        if (paths.size() == 0 || paths.get(0).equals("0")){
+            upRes.setParent(parent);
+            userRes.add(upRes);
+        }else {
+            //取出最后一个元素，paths 中是由内到外的
+            String path = paths.remove(paths.size() - 1);
+            for (int i = 0; i < userRes.size(); i++) {
+                Resource resource = userRes.get(i);
+                if (resource.getUid().equals(path)) {
+                    //递归出口条件，可将递归出口条件同根目录合并，其实根目录也就是为 0 的时候。
+                    // if (paths.size() == 0) {
+                    //     ArrayList<Resource> updateRes = new ArrayList<>();
+                    //     updateRes.add(upRes);
+                    //     resource.setChildren(updateRes);
+                    // }
+                    resource.setChildren(aRes(paths, resource.getChildren(), upRes, path));
+                    userRes.set(i, resource);
+                    break;
+                }
+            }
+        }
+        return userRes;
+    }
+
+    @Override
+    public JsonResult delRes(Principal principal, String uid, ArrayList<String> paths) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        ArrayList<Resource> deletedRes = dRes(userRes, uid, paths);
+        HashMap<String, Object> delInfoMap = new HashMap<>();
+        delInfoMap.put("resource", deletedRes);
+        Update update = commonUtil.setUpdate(delInfoMap);
+        return userDao.updateInfo(email, update);
+    }
+
+    public ArrayList<Resource> dRes(ArrayList<Resource> userRes, String uid, ArrayList<String> paths){
+        //根目录或遍历到父节点，此为结束条件
+        if (paths.size() == 0 || paths.get(0).equals("0")){
+            //此时就只有一层
+            for (int j = 0; j < userRes.size(); j++){
+                Resource resource = userRes.get(j);
+                if (resource.getUid().equals(uid)){
+                    userRes.remove(j);
+                }
+            }
+        }else {
+            String path = paths.remove(paths.size() - 1);
+            for (int i = 0; i < userRes.size(); i++){
+                Resource resource = userRes.get(i);
+                if (resource.getUid().equals(path)){
+                    dRes(resource.getChildren(), uid, paths);
+                    userRes.set(i, resource);
+                }
+            }
+        }
+        return userRes;
+    }
+
+    /**
+     * 更新内容
+     * @param principal
+     * @param updateRes
+     * @param paths
+     * @return
+     */
+    @Override
+    public JsonResult putRes(Principal principal, Resource updateRes, ArrayList<String> paths) {
+        String email = principal.getName();
+        User user =  (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        ArrayList<Resource> resources = pRes(userRes, updateRes, paths);
+        HashMap<String, Object> putInfoMap = new HashMap<>();
+        putInfoMap.put("resource", resources);
+        Update update = commonUtil.setUpdate(putInfoMap);
+        return userDao.updateInfo(email, update);
+    }
+
+    public ArrayList<Resource> pRes(ArrayList<Resource> userRes, Resource putRes, ArrayList<String> paths){
+        if (paths.size() == 0 || paths.get(0).equals("0")){
+            String putResUid = putRes.getUid();
+            for (int j =0; j < userRes.size(); j++){
+                Resource resource = userRes.get(j);
+                if (resource.getUid().equals(putResUid)){
+                    //将原来位置内容替换为新的内容
+                    userRes.remove(j);
+                    userRes.add(j, putRes);
+                }
+            }
+        }else {
+            String path = paths.remove(paths.size() - 1);
+            for (int i = 0; i < userRes.size(); i++){
+                Resource resource = userRes.get(i);
+                if (resource.getUid().equals(path)){
+                    pRes(resource.getChildren(), putRes, paths);
+                    userRes.set(i, resource);
+                }
+            }
+        }
+        return userRes;
     }
 }

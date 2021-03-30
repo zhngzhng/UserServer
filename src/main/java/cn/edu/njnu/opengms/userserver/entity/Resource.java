@@ -16,7 +16,7 @@ public class Resource {
     private String name;
     //数据在数据容器中的链接
     private String address;
-    private boolean isFolder;
+    private Boolean isFolder;
     private String type;
     private String privacy;
     private String thumbnail;

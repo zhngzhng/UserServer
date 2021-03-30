@@ -46,7 +46,7 @@ public class ResController {
         return userService.newPwd(principal, oldPwd, newPwd);
     }
 
-    // 资源相关操作
+    // 资源相关操作，这是老版本废弃版本
     @RequestMapping(value = "/res", method = RequestMethod.POST)
     public JsonResult uploadRes(Principal principal, @RequestBody ArrayList<Resource> resources){
         return userService.updateRes(principal, resources, "push");
@@ -60,6 +60,27 @@ public class ResController {
     @RequestMapping(value = "/res/{uids}", method = RequestMethod.DELETE)
     public JsonResult delRes(Principal principal, @PathVariable("uids") String[] uids){
         return userService.delRes(principal, uids);
+    }
+
+
+    //资源(文件夹)相关操作
+    @RequestMapping(value = "/res/{paths}", method = RequestMethod.POST)
+    public JsonResult uploadRes(Principal principal, @RequestBody Resource resource, @PathVariable ArrayList<String> paths){
+        return userService.addRes(principal, resource, paths);
+    }
+
+    @RequestMapping(value = "/res/{uid}/{paths}", method = RequestMethod.DELETE)
+    public JsonResult delRes(Principal principal,
+                             @PathVariable("uid") String uid,
+                             @PathVariable("paths") ArrayList<String> paths){
+        return userService.delRes(principal, uid, paths);
+    }
+
+    @RequestMapping(value = "/res/{paths}", method = RequestMethod.PUT)
+    public JsonResult putRes(Principal principal,
+                             @RequestBody Resource resource,
+                             @PathVariable("paths") ArrayList<String> paths){
+        return userService.putRes(principal, resource, paths);
     }
 
 
