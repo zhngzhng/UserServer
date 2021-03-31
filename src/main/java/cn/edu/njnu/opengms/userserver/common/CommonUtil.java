@@ -85,6 +85,13 @@ public class CommonUtil {
                         break;
                     //头像传输为 Base64,将 base64 转换为静态资源进行存储，然后将路径存储avatar字段中
                     case "avatar":
+                        String base64Str = "";
+                        String[] split = ((String)value).split(",");
+                        if (split.length == 2){
+                            base64Str = split[1];
+                        }else {
+                            base64Str = split[0];
+                        }
                         //新建文件夹
                         File path = new File(ResourceUtils.getURL("classpath:").getPath());
                         if (!path.exists()) {
@@ -96,7 +103,7 @@ public class CommonUtil {
                         }
                         String avatarId = UUID.randomUUID().toString();
                         File avatar = new File(path.getAbsolutePath(), "static/avatar/" + avatarId + ".jpg");
-                        byte[] avatarBytes = new BASE64Decoder().decodeBuffer((String) value);
+                        byte[] avatarBytes = new BASE64Decoder().decodeBuffer(base64Str);
                         for (int i = 0; i < avatarBytes.length; i++) {
                             if (avatarBytes[i] < 0) {
                                 avatarBytes[i] += 256;

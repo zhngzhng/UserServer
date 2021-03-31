@@ -45,80 +45,80 @@ public class UserServiceImpl implements UserService {
         return userDao.updateInfo(email, update);
     }
 
-    /**
-     * 资源相关操作
-     *
-     * @param principal
-     * @param resources
-     * @return
-     */
-    @Override
-    public JsonResult updateRes(Principal principal, ArrayList<Resource> resources, String operationType) {
-        String email = principal.getName();
-        User user = (User) userDao.findUserById(email).getData();
-        ArrayList<Resource> userRes = user.getResource();
-        if (userRes == null) {
-            userRes = new ArrayList<Resource>();
-        }
-        HashMap<String, Object> userInfoMap = new HashMap<>();
-        switch (operationType) {
-            case "push":
-                for (int i = 0; i < resources.size(); i++) {
-                    Resource resource = resources.get(i);
-                    userRes.add(resource);
-                }
-                break;
-            case "update":
-                //具备批量修改功能
-                ArrayList<Integer> delTag = new ArrayList<Integer>();
-                for (int i = 0; i < resources.size(); i++) {
-                    for (int j = 0; j < userRes.size(); j++) {
-                        //传输过来的res id与 userRes相同则记录
-                        if (resources.get(i).getUid().equals(userRes.get(j).getUid())) {
-                            delTag.add(j);
-                            userRes.add(resources.get(i));
-                            break;
-                        }
-                    }
-                }
-                //对所匹配的序号进行排序，后续删除的时候通过-1
-                delTag.sort(Comparator.naturalOrder());
-                for (int index = 0; index < delTag.size(); index++) {
-                    userRes.remove(delTag.get(index) - index);
-                }
-                break;
-        }
-        userInfoMap.put("resource", userRes);
-        Update update = commonUtil.setUpdate(userInfoMap);
-        //基本属于是只能成功
-        userDao.updateInfo(email, update);
-        return ResultUtils.success(userRes);
-    }
+    // /**
+    //  * 资源相关操作
+    //  *
+    //  * @param principal
+    //  * @param resources
+    //  * @return
+    //  */
+    // @Override
+    // public JsonResult updateRes(Principal principal, ArrayList<Resource> resources, String operationType) {
+    //     String email = principal.getName();
+    //     User user = (User) userDao.findUserById(email).getData();
+    //     ArrayList<Resource> userRes = user.getResource();
+    //     if (userRes == null) {
+    //         userRes = new ArrayList<Resource>();
+    //     }
+    //     HashMap<String, Object> userInfoMap = new HashMap<>();
+    //     switch (operationType) {
+    //         case "push":
+    //             for (int i = 0; i < resources.size(); i++) {
+    //                 Resource resource = resources.get(i);
+    //                 userRes.add(resource);
+    //             }
+    //             break;
+    //         case "update":
+    //             //具备批量修改功能
+    //             ArrayList<Integer> delTag = new ArrayList<Integer>();
+    //             for (int i = 0; i < resources.size(); i++) {
+    //                 for (int j = 0; j < userRes.size(); j++) {
+    //                     //传输过来的res id与 userRes相同则记录
+    //                     if (resources.get(i).getUid().equals(userRes.get(j).getUid())) {
+    //                         delTag.add(j);
+    //                         userRes.add(resources.get(i));
+    //                         break;
+    //                     }
+    //                 }
+    //             }
+    //             //对所匹配的序号进行排序，后续删除的时候通过-1
+    //             delTag.sort(Comparator.naturalOrder());
+    //             for (int index = 0; index < delTag.size(); index++) {
+    //                 userRes.remove(delTag.get(index) - index);
+    //             }
+    //             break;
+    //     }
+    //     userInfoMap.put("resource", userRes);
+    //     Update update = commonUtil.setUpdate(userInfoMap);
+    //     //基本属于是只能成功
+    //     userDao.updateInfo(email, update);
+    //     return ResultUtils.success(userRes);
+    // }
 
-    @Override
-    public JsonResult delRes(Principal principal, String[] uids) {
-        String email = principal.getName();
-        User user = (User) userDao.findUserById(email).getData();
-        ArrayList<Resource> resource = user.getResource();
-        ArrayList<Integer> delTag = new ArrayList<Integer>();
-        for (int i = 0; i < uids.length; i++) {
-            for (int j = 0; j < resource.size(); j++) {
-                if (resource.get(j).getUid().equals(uids[i])) {
-                    delTag.add(j);
-                    break;
-                }
-            }
-        }
-        //对所匹配的序号进行排序，后续删除的时候通过-1
-        delTag.sort(Comparator.naturalOrder());
-        for (int index = 0; index < delTag.size(); index++) {
-            resource.remove(delTag.get(index) - index);
-        }
-        HashMap<String, Object> userInfoMap = new HashMap<>();
-        userInfoMap.put("resource", resource);
-        Update update = commonUtil.setUpdate(userInfoMap);
-        return userDao.updateInfo(email, update);
-    }
+    // @Override
+    // public JsonResult delRes(Principal principal, String[] uids) {
+    //     String email = principal.getName();
+    //     User user = (User) userDao.findUserById(email).getData();
+    //     ArrayList<Resource> resource = user.getResource();
+    //     ArrayList<Integer> delTag = new ArrayList<Integer>();
+    //     for (int i = 0; i < uids.length; i++) {
+    //         for (int j = 0; j < resource.size(); j++) {
+    //             if (resource.get(j).getUid().equals(uids[i])) {
+    //                 delTag.add(j);
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     //对所匹配的序号进行排序，后续删除的时候通过-1
+    //     delTag.sort(Comparator.naturalOrder());
+    //     for (int index = 0; index < delTag.size(); index++) {
+    //         resource.remove(delTag.get(index) - index);
+    //     }
+    //     HashMap<String, Object> userInfoMap = new HashMap<>();
+    //     userInfoMap.put("resource", resource);
+    //     Update update = commonUtil.setUpdate(userInfoMap);
+    //     return userDao.updateInfo(email, update);
+    // }
 
     @Override
     public JsonResult addUser(User user) {
@@ -226,29 +226,6 @@ public class UserServiceImpl implements UserService {
         return userDao.addClient(client);
     }
 
-
-    // public JsonResult addFolder(Principal principal, ArrayList<String> paths, String folderName, String privacy) {
-    //     String email = principal.getName();
-    //     User user = (User) userDao.findUserById(email).getData();
-    //     ArrayList<Resource> resource = user.getResource();
-    //     if (resource == null) {
-    //         resource = new ArrayList<Resource>();
-    //     }
-    //     Resource folder = new Resource();
-    //     folder.setFolder(true);
-    //     //根文件夹
-    //     if (paths.size() == 0) {
-    //         folder.setName(folderName);
-    //         folder.setPrivacy(privacy);
-    //         HashMap<String, Object> updateMap = new HashMap<>();
-    //         resource.add(folder);
-    //         updateMap.put("resource", resource);
-    //         Update update = commonUtil.setUpdate(updateMap);
-    //         return userDao.updateInfo(email, update);
-    //     }
-    //     //不是根文件夹则需要根据 path 搜索到具体位置然后新建文件夹
-    //     return null;
-    // }
 
     /**
      * 添加文件夹
@@ -404,7 +381,7 @@ public class UserServiceImpl implements UserService {
     public JsonResult changeFolder(Principal principal, Resource upRes, ArrayList<String> oldPaths, ArrayList<String> newPaths) {
         String resUid = upRes.getUid();
         String email = principal.getName();
-        User user = (User)userDao.findUserById(email).getData();
+        User user = (User) userDao.findUserById(email).getData();
         ArrayList<Resource> userRes = user.getResource();
         ArrayList<Resource> deletedRes = dRes(userRes, resUid, oldPaths);
         ArrayList<Resource> addedRes = aRes(newPaths, deletedRes, upRes, "0");
@@ -412,5 +389,30 @@ public class UserServiceImpl implements UserService {
         changedInfoMap.put("resource", addedRes);
         Update update = commonUtil.setUpdate(changedInfoMap);
         return userDao.updateInfo(email, update);
+    }
+
+    @Override
+    public JsonResult getFileByPath(Principal principal, ArrayList<String> paths) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        ArrayList<Resource> resources = gFileByPath(userRes, paths);
+        return ResultUtils.success(resources);
+    }
+
+    public ArrayList<Resource> gFileByPath(ArrayList<Resource> userRes, ArrayList<String> paths) {
+        ArrayList<Resource> folderList = new ArrayList<>();
+        if (paths.size() == 0 || paths.get(0).equals("0")) {
+            return userRes;
+        } else {
+            String path = paths.remove(paths.size() - 1);
+            for (int i = 0; i < userRes.size(); i++) {
+                Resource resource = userRes.get(i);
+                if (resource.getUid().equals(path)) {
+                    folderList =  gFileByPath(resource.getChildren(), paths);
+                }
+            }
+        }
+        return folderList;
     }
 }

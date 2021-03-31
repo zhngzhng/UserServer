@@ -19,6 +19,7 @@ public class User {
     private String email;
     private String password;
     private String name;
+
     private String phone;
     private UserTitle title;
     private String country;

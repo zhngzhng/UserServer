@@ -46,35 +46,38 @@ public class ResController {
         return userService.newPwd(principal, oldPwd, newPwd);
     }
 
-    // 资源相关操作，这是老版本废弃版本
-    @RequestMapping(value = "/res", method = RequestMethod.POST)
-    public JsonResult uploadRes(Principal principal, @RequestBody ArrayList<Resource> resources){
-        return userService.updateRes(principal, resources, "push");
-    }
-
-    @RequestMapping(value = "/res", method = RequestMethod.PUT)
-    public JsonResult updateRes(Principal principal, @RequestBody ArrayList<Resource> resources){
-        return userService.updateRes(principal, resources, "update");
-    }
-
-    @RequestMapping(value = "/res/{uids}", method = RequestMethod.DELETE)
-    public JsonResult delRes(Principal principal, @PathVariable("uids") String[] uids){
-        return userService.delRes(principal, uids);
-    }
-
 
     //资源(文件夹)相关操作
 
+    /**
+     * 获取用户所有资源
+     * @param principal
+     * @return
+     */
     @RequestMapping(value = "/res", method = RequestMethod.GET)
     public JsonResult getAllFile(Principal principal){
         return userService.getAllFileService(principal);
     }
 
+    /**
+     * 上传资源/新建文件夹
+     * @param principal
+     * @param resource
+     * @param paths 由内到外写，
+     * @return
+     */
     @RequestMapping(value = "/res/{paths}", method = RequestMethod.POST)
     public JsonResult uploadRes(Principal principal, @RequestBody Resource resource, @PathVariable ArrayList<String> paths){
         return userService.addRes(principal, resource, paths);
     }
 
+    /**
+     * 删除资源
+     * @param principal
+     * @param uid 需要删除的资源的 id
+     * @param paths
+     * @return
+     */
     @RequestMapping(value = "/res/{uid}/{paths}", method = RequestMethod.DELETE)
     public JsonResult delRes(Principal principal,
                              @PathVariable("uid") String uid,
@@ -82,6 +85,13 @@ public class ResController {
         return userService.delRes(principal, uid, paths);
     }
 
+    /**
+     * 更新资源信息
+     * @param principal
+     * @param resource 需要将资源所有内容传过来
+     * @param paths
+     * @return
+     */
     @RequestMapping(value = "/res/{paths}", method = RequestMethod.PUT)
     public JsonResult putRes(Principal principal,
                              @RequestBody Resource resource,
@@ -89,12 +99,25 @@ public class ResController {
         return userService.putRes(principal, resource, paths);
     }
 
+    /**
+     * 修改资源路径
+     * @param principal
+     * @param resource 需要移动的资源
+     * @param newPaths 新的资源路径
+     * @param oldPaths 老的资源路径
+     * @return
+     */
     @RequestMapping(value = "/res/{newPaths}/{oldPaths}", method = RequestMethod.PUT)
     public JsonResult changeFolder(Principal principal,
                                    @RequestBody Resource resource,
                                    @PathVariable("newPaths") ArrayList<String> newPaths,
                                    @PathVariable("oldPaths") ArrayList<String> oldPaths){
         return userService.changeFolder(principal, resource, oldPaths, newPaths);
+    }
+
+    @RequestMapping(value = "/res/{paths}", method = RequestMethod.GET)
+    public JsonResult getFileByPath(Principal principal, @PathVariable("paths") ArrayList<String> paths){
+        return userService.getFileByPath(principal, paths);
     }
 
 

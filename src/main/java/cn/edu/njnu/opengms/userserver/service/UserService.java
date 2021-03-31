@@ -24,10 +24,10 @@ public interface UserService {
     JsonResult newPwd(Principal principal, String oldPwd, String newPwd);
 
     //添加、更新资源
-    JsonResult updateRes(Principal principal, ArrayList<Resource> resources, String operationType);
-
-    //删除资源是单独的
-    JsonResult delRes(Principal principal, String[] uids);
+    // JsonResult updateRes(Principal principal, ArrayList<Resource> resources, String operationType);
+    //
+    // //删除资源是单独的
+    // JsonResult delRes(Principal principal, String[] uids);
 
     JsonResult addClientService(ClientDetails client);
 
@@ -42,6 +42,8 @@ public interface UserService {
     JsonResult getAllFileService(Principal principal);
 
     JsonResult changeFolder(Principal principal, Resource upRes, ArrayList<String> oldPaths, ArrayList<String> newPaths);
+
+    JsonResult getFileByPath(Principal principal, ArrayList<String> paths);
 
     // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
 }
