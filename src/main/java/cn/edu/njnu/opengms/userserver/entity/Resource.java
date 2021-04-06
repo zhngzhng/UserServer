@@ -30,4 +30,14 @@ public class Resource {
     private String template;
     private Date uploadTime;
     private ArrayList<Resource> children;
+
+    public Resource(String uid, String name, Boolean isFolder, String privacy, String parent, ArrayList<Resource> children) {
+        this.uid = uid;
+        this.name = name;
+        this.isFolder = isFolder;
+        this.privacy = privacy;
+        this.parent = parent;
+        this.uploadTime = new Date();
+        this.children = children;
+    }
 }

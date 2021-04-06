@@ -50,9 +50,13 @@ public class CommonUtil {
         try {
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
             InternetAddress internetAddress = new InternetAddress(mailAddress, "OpenGMS Team", "UTF-8");
+            //发件人地址
             helper.setFrom(internetAddress);
-            helper.setText(to);
+            //邮件接收地址
+            helper.setTo(to);
+            //设置抄送地址
             helper.setCc(mailAddress);
+            //邮件内容相关
             helper.setSubject(subject);
             helper.setText(content, true);
             mailSender.send(mimeMessage);
@@ -85,6 +89,9 @@ public class CommonUtil {
                         break;
                     //头像传输为 Base64,将 base64 转换为静态资源进行存储，然后将路径存储avatar字段中
                     case "avatar":
+                        if (value == null || value.equals("")){
+                            continue;
+                        }
                         String base64Str = "";
                         String[] split = ((String)value).split(",");
                         if (split.length == 2){

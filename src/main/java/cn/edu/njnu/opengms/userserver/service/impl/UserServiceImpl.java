@@ -35,7 +35,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public JsonResult getUserInfo(String email) {
-        return userDao.findUserById(email);
+        JsonResult jsonResult = userDao.findUserById(email);
+        if (jsonResult.getCode() != 0){
+            return jsonResult;
+        }
+        User user = (User) jsonResult.getData();
+        user.setPassword("");
+        return ResultUtils.success(user);
     }
 
     @Override
@@ -95,36 +101,16 @@ public class UserServiceImpl implements UserService {
     //     return ResultUtils.success(userRes);
     // }
 
-    // @Override
-    // public JsonResult delRes(Principal principal, String[] uids) {
-    //     String email = principal.getName();
-    //     User user = (User) userDao.findUserById(email).getData();
-    //     ArrayList<Resource> resource = user.getResource();
-    //     ArrayList<Integer> delTag = new ArrayList<Integer>();
-    //     for (int i = 0; i < uids.length; i++) {
-    //         for (int j = 0; j < resource.size(); j++) {
-    //             if (resource.get(j).getUid().equals(uids[i])) {
-    //                 delTag.add(j);
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     //对所匹配的序号进行排序，后续删除的时候通过-1
-    //     delTag.sort(Comparator.naturalOrder());
-    //     for (int index = 0; index < delTag.size(); index++) {
-    //         resource.remove(delTag.get(index) - index);
-    //     }
-    //     HashMap<String, Object> userInfoMap = new HashMap<>();
-    //     userInfoMap.put("resource", resource);
-    //     Update update = commonUtil.setUpdate(userInfoMap);
-    //     return userDao.updateInfo(email, update);
-    // }
 
     @Override
     public JsonResult addUser(User user) {
         user.setUserId(UUID.randomUUID().toString());
         if (user.getResource() == null) {
-            user.setResource(new ArrayList<Resource>());
+            String defaultFolderUid = UUID.randomUUID().toString();
+            Resource defaultFolder = new Resource(defaultFolderUid, "My Data", true, "public", "0", new ArrayList<Resource>());
+            ArrayList<Resource> resources = new ArrayList<>();
+            resources.add(defaultFolder);
+            user.setResource(resources);
         }
         user.setCreatedTime(new Date());
         return userDao.createUser(user);
@@ -192,10 +178,9 @@ public class UserServiceImpl implements UserService {
         if (min > 30) {
             return ResultUtils.error("The verification code is invalid");
         }
-        HashMap<String, Object> userInfo = new HashMap<>();
-        // String encodePwd = DigestUtils.sha256Hex(DigestUtils.md5Hex(newPwd.getBytes()));
-        userInfo.put("password", newPwd);
-        Update update = commonUtil.setUpdate(userInfo);
+        // // String encodePwd = DigestUtils.sha256Hex(DigestUtils.md5Hex(newPwd.getBytes()));
+        Update update = new Update();
+        update.set("password", newPwd);
         JsonResult resetPwdResult = userDao.updateInfo(email, update);
         if (resetPwdResult.getCode() != 0) {
             return resetPwdResult;
@@ -215,9 +200,8 @@ public class UserServiceImpl implements UserService {
             return ResultUtils.error("Old password is not correct!");
         }
         //密码匹配情况
-        HashMap<String, Object> userInfoMap = new HashMap<>();
-        userInfoMap.put("password", newPwd);
-        Update update = commonUtil.setUpdate(userInfoMap);
+        Update update = new Update();
+        update.set("password", newPwd);
         return userDao.updateInfo(email, update);
     }
 

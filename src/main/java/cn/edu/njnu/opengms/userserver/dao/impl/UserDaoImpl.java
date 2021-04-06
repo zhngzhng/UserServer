@@ -77,7 +77,7 @@ public class UserDaoImpl implements UserDao {
             if (user == null) {
                 return ResultUtils.noObject();
             }
-            user.setPassword("");
+            // user.setPassword("");
             return ResultUtils.success(user);
         } catch (MongoException e) {
             return ResultUtils.error(e.toString());
