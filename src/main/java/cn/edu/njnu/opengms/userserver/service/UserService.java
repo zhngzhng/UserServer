@@ -23,6 +23,8 @@ public interface UserService {
 
     JsonResult newPwd(Principal principal, String oldPwd, String newPwd);
 
+    JsonResult getUserBase(Principal principal);
+
     //添加、更新资源
     // JsonResult updateRes(Principal principal, ArrayList<Resource> resources, String operationType);
     //
@@ -39,11 +41,23 @@ public interface UserService {
 
     JsonResult putRes(Principal principal, Resource updateRes, ArrayList<String> paths);
 
-    JsonResult getAllFileService(Principal principal);
-
     JsonResult changeFolder(Principal principal, Resource upRes, ArrayList<String> oldPaths, ArrayList<String> newPaths);
 
     JsonResult getFileByPath(Principal principal, ArrayList<String> paths);
+
+    JsonResult getAllResService(Principal principal);
+
+    JsonResult getAllFolder(Principal principal);
+
+    JsonResult delByUid(Principal principal, String uid);
+
+    JsonResult putByUid(Principal principal, Resource res);
+
+    JsonResult findResByField(Principal principal,  String field, String value);
+
+    JsonResult searchResByKeyword(Principal principal, String keyword);
+
+
 
     // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
 }

@@ -3,6 +3,7 @@ package cn.edu.njnu.opengms.userserver.controller;
 import cn.edu.njnu.opengms.userserver.common.JsonResult;
 import cn.edu.njnu.opengms.userserver.entity.ClientDetails;
 import cn.edu.njnu.opengms.userserver.entity.User;
+import cn.edu.njnu.opengms.userserver.service.UserService;
 import cn.edu.njnu.opengms.userserver.service.impl.UserServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

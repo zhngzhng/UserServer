@@ -34,4 +34,5 @@ public class User {
     private ArrayList<String> loginIp;
     private ArrayList<String> domain;
     private ArrayList<Resource> resource;
+
 }

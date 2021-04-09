@@ -16,7 +16,9 @@ public class Resource {
     private String name;
     //数据在数据容器中的链接
     private String address;
-    private Boolean isFolder;
+    private Boolean folder;
+    //用户上传或者模型运行结果
+    private Boolean userUpload;
     private String type;
     private String privacy;
     private String thumbnail;
@@ -31,10 +33,10 @@ public class Resource {
     private Date uploadTime;
     private ArrayList<Resource> children;
 
-    public Resource(String uid, String name, Boolean isFolder, String privacy, String parent, ArrayList<Resource> children) {
+    public Resource(String uid, String name, Boolean folder, String privacy, String parent, ArrayList<Resource> children) {
         this.uid = uid;
         this.name = name;
-        this.isFolder = isFolder;
+        this.folder = folder;
         this.privacy = privacy;
         this.parent = parent;
         this.uploadTime = new Date();

@@ -46,17 +46,27 @@ public class ResController {
         return userService.newPwd(principal, oldPwd, newPwd);
     }
 
+    /**
+     * 获取用户除资源外的所有字段
+     * @param principal
+     * @return
+     */
+    @RequestMapping(value = "/userBase", method = RequestMethod.GET)
+    public JsonResult getUserBase(Principal principal){
+        return userService.getUserBase(principal);
+    }
+
 
     //资源(文件夹)相关操作
 
     /**
-     * 获取用户所有资源
+     * 获取用户资源
      * @param principal
      * @return
      */
     @RequestMapping(value = "/res", method = RequestMethod.GET)
     public JsonResult getAllFile(Principal principal){
-        return userService.getAllFileService(principal);
+        return userService.getAllResService(principal);
     }
 
     /**
@@ -118,6 +128,48 @@ public class ResController {
     @RequestMapping(value = "/res/{paths}", method = RequestMethod.GET)
     public JsonResult getFileByPath(Principal principal, @PathVariable("paths") ArrayList<String> paths){
         return userService.getFileByPath(principal, paths);
+    }
+
+
+    //===========================2021/4/8=================
+    /**
+     * 获取用户文件夹
+     * @param principal
+     * @return
+     */
+    @RequestMapping(value = "/res/folder",method = RequestMethod.GET)
+    public JsonResult getAllFolder(Principal principal){
+        return userService.getAllFolder(principal);
+    }
+
+    /**
+     * 更新资源信息，只需要将需要更新的资源传过来，不需要路径
+     * @param principal
+     * @param resource
+     * @return
+     */
+    @RequestMapping(value = "/res",produces = "application/json;charset=utf-8", method = RequestMethod.PUT)
+    public JsonResult updateResByUid(Principal principal, @RequestBody Resource resource){
+        return userService.putByUid(principal, resource);
+    }
+
+    /**
+     * 删除资源，将需要删除的资源的 id 传过来即可
+     */
+    @RequestMapping(value = "/res/{uid}",method = RequestMethod.DELETE)
+    public JsonResult delResByUid(Principal principal, @PathVariable String uid){
+        return userService.delByUid(principal, uid);
+    }
+    
+    /**
+    * @Author zhngzhng
+    * @Description 通过关键字或后缀名查询资源，支持模糊查询
+    * @Param [principal, keyword]
+    * @Date 2021/4/8
+    */
+    @RequestMapping(value = "/res/search/{keyword}", method = RequestMethod.GET)
+    public JsonResult searchResByKeyword(Principal principal, @PathVariable String keyword){
+        return userService.searchResByKeyword(principal, keyword);
     }
 
 

@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 
 import java.security.Principal;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @ClassName UserServiceImpl
@@ -36,7 +38,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public JsonResult getUserInfo(String email) {
         JsonResult jsonResult = userDao.findUserById(email);
-        if (jsonResult.getCode() != 0){
+        if (jsonResult.getCode() != 0) {
             return jsonResult;
         }
         User user = (User) jsonResult.getData();
@@ -105,14 +107,12 @@ public class UserServiceImpl implements UserService {
     @Override
     public JsonResult addUser(User user) {
         user.setUserId(UUID.randomUUID().toString());
-        if (user.getResource() == null) {
-            String defaultFolderUid = UUID.randomUUID().toString();
-            Resource defaultFolder = new Resource(defaultFolderUid, "My Data", true, "public", "0", new ArrayList<Resource>());
-            ArrayList<Resource> resources = new ArrayList<>();
-            resources.add(defaultFolder);
-            user.setResource(resources);
-        }
         user.setCreatedTime(new Date());
+        //初始化一个文件夹给他
+        ArrayList<Resource> res = new ArrayList<Resource>();
+        Resource defaultFolder = new Resource(UUID.randomUUID().toString(), "My Data", true, "public", "0", new ArrayList<Resource>());
+        res.add(defaultFolder);
+        user.setResource(res);
         return userDao.createUser(user);
     }
 
@@ -351,12 +351,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public JsonResult getAllFileService(Principal principal) {
+    public JsonResult getAllResService(Principal principal) {
         String email = principal.getName();
         User user = (User) userDao.findUserById(email).getData();
         ArrayList<Resource> resource = user.getResource();
-        if (resource == null) {
-            resource = new ArrayList<Resource>();
+        if (resource == null || resource.size() == 0) {
+            String defaultFolderUid = UUID.randomUUID().toString();
+            resource = addDefaultFolder(email, defaultFolderUid);
         }
         return ResultUtils.success(resource);
     }
@@ -393,10 +394,195 @@ public class UserServiceImpl implements UserService {
             for (int i = 0; i < userRes.size(); i++) {
                 Resource resource = userRes.get(i);
                 if (resource.getUid().equals(path)) {
-                    folderList =  gFileByPath(resource.getChildren(), paths);
+                    folderList = gFileByPath(resource.getChildren(), paths);
                 }
             }
         }
         return folderList;
+    }
+
+    @Override
+    public JsonResult getUserBase(Principal principal) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        user.setResource(null);
+        return ResultUtils.success(user);
+    }
+
+
+    //添加默认的文件夹
+    private ArrayList<Resource> addDefaultFolder(String email, String uid) {
+        ArrayList<Resource> resource = new ArrayList<Resource>();
+        Resource defaultFolder = new Resource(uid, "My Data", true, "public", "0", new ArrayList<Resource>());
+        resource.add(defaultFolder);
+        HashMap<String, Object> putInfoMap = new HashMap<>();
+        putInfoMap.put("resource", resource);
+        Update update = commonUtil.setUpdate(putInfoMap);
+        userDao.updateInfo(email, update);
+        return resource;
+    }
+
+
+    @Override
+    public JsonResult getAllFolder(Principal principal) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> resource = user.getResource();
+        //如果没有内容，则新建一个给它
+        //递归所有文件夹，去掉资源，只返回文件夹内容
+        if (resource == null || resource.size() == 0) {
+            ArrayList<JSONObject> allFolder = new ArrayList<>();
+            JSONObject jsonObject = new JSONObject();
+            //直接这样显然不行呀
+            String defaultFolderId = UUID.randomUUID().toString();
+            //新建默认的文件夹
+            addDefaultFolder(email, defaultFolderId);
+            jsonObject.put("uid", defaultFolderId);
+            jsonObject.put("name", "My Data");
+            jsonObject.put("folder", true);
+            jsonObject.put("parent", "0");
+            jsonObject.put("children", null);
+            allFolder.add(jsonObject);
+            return ResultUtils.success(allFolder);
+        } else {
+            ArrayList<JSONObject> allFolder = aFolder(resource);
+            return ResultUtils.success(allFolder);
+        }
+    }
+
+    public ArrayList<JSONObject> aFolder(ArrayList<Resource> userRes) {
+        ArrayList<JSONObject> parent = new ArrayList<>();
+        //不修改原内容，将捕获到的文件夹内容重写塞到一个新的ArrayList<Resource> 里面
+        for (int i = 0; i < userRes.size(); i++) {
+            Resource resource = userRes.get(i);
+            if (resource.getFolder()) {
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("uid", resource.getUid());
+                jsonObject.put("name", resource.getName());
+                jsonObject.put("folder", resource.getFolder());
+                jsonObject.put("parent", resource.getParent());
+                jsonObject.put("children", aFolder(resource.getChildren()));
+                parent.add(jsonObject);
+            }
+        }
+        return parent;
+    }
+
+    @Override
+    public JsonResult delByUid(Principal principal, String uid) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        ArrayList<Resource> deletedRes = dByUid(userRes, uid);
+        HashMap<String, Object> putInfoMap = new HashMap<>();
+        putInfoMap.put("resource", deletedRes);
+        Update update = commonUtil.setUpdate(putInfoMap);
+        return userDao.updateInfo(email, update);
+    }
+
+    private ArrayList<Resource> dByUid(ArrayList<Resource> uRes, String uid) {
+        for (int i = 0; i < uRes.size(); i++) {
+            Resource resource = uRes.get(i);
+            if (resource.getUid().equals(uid)) {
+                uRes.remove(i);
+            } else {
+                dByUid(resource.getChildren(), uid);
+            }
+        }
+        return uRes;
+    }
+
+
+    @Override
+    public JsonResult putByUid(Principal principal, Resource res) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        String putResId = res.getUid();
+        ArrayList<Resource> putRes = pResByUid(userRes, res, putResId);
+        Map<String, Object> updateInfoMap = new HashMap<>();
+        updateInfoMap.put("resource", putRes);
+        Update update = commonUtil.setUpdate(updateInfoMap);
+        return userDao.updateInfo(email, update);
+    }
+
+    private ArrayList<Resource> pResByUid(ArrayList<Resource> uRes, Resource res, String uid) {
+        for (int i = 0; i < uRes.size(); i++) {
+            Resource resource = uRes.get(i);
+            if (resource.getUid().equals(uid)) {
+                uRes.remove(i);
+                uRes.add(i, res);
+            } else {
+                pResByUid(resource.getChildren(), res, uid);
+            }
+        }
+        return uRes;
+    }
+
+    /**
+     * 更强大的查询功能，可通过多个字段进行查询
+     *
+     * @param principal
+     * @param field
+     * @param value
+     * @return
+     */
+    @Override
+    public JsonResult findResByField(Principal principal, String field, String value) {
+        //涉及到资源已经不是读写数据库的查询了，而是遍历查询对比
+        String email = principal.getName();
+        //dao 层使用 JsonResult 就是败笔
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+
+        //遍历 or 递归
+        return null;
+    }
+
+    private ArrayList<Resource> fResByField(ArrayList<Resource> userRes, String field, String value) {
+
+        return null;
+    }
+
+    @Override
+    public JsonResult searchResByKeyword(Principal principal, String keyword) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        ArrayList<Resource> tempRes = new ArrayList<>();
+        ArrayList<Resource> matchedRes = sResByKeyword(userRes, keyword, tempRes);
+        if (matchedRes.size() > 0){
+            return ResultUtils.success(matchedRes);
+        }
+        return ResultUtils.noObject();
+    }
+
+    private ArrayList<Resource> sResByKeyword(ArrayList<Resource> userRes, String keyword, ArrayList<Resource> matchedRes) {
+        //资源为空或者没内容的时候停止
+        if (userRes != null || userRes.size() != 0) {
+            for (int i = 0; i < userRes.size(); i++) {
+                Resource resource = userRes.get(i);
+                //正则表达式匹配, 名称或后缀
+                Pattern pattern = Pattern.compile(keyword, Pattern.CASE_INSENSITIVE);
+                Matcher matcher = pattern.matcher(resource.getName());
+                //资源或文件夹都可以查询的
+                if (resource.getFolder()){
+                    //为文件夹时
+                    if (matcher.find()){
+                        matchedRes.add(resource);
+                    }else {
+                        sResByKeyword(resource.getChildren(), keyword, matchedRes);
+                    }
+                }else{
+                    //为资源时
+                    Matcher matcher1 = pattern.matcher(resource.getSuffix());
+                    if (matcher.find() || matcher1.find()){
+                        matchedRes.add(resource);
+                    }
+                }
+            }
+            return matchedRes;
+        }
+        return matchedRes;
     }
 }
