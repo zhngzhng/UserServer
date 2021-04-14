@@ -13,6 +13,8 @@ import java.util.HashMap;
 public interface UserService {
     JsonResult getUserInfo(String email);
 
+    JsonResult loginService(String email, String loginIp);
+
     JsonResult updateUserInfo(Principal principal,HashMap<String, Object> updateInfo);
 
     JsonResult addUser(User user);
@@ -60,4 +62,7 @@ public interface UserService {
 
 
     // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
+
+    //入库函数
+    Object removeUserInDB(User user);
 }

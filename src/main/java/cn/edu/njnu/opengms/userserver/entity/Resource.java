@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -12,6 +13,7 @@ import java.util.Date;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Resource {
+    @Id
     private String uid;
     private String name;
     //数据在数据容器中的链接
@@ -30,6 +32,7 @@ public class Resource {
     private String suffix;
     private String description;
     private String template;
+    @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")
     private Date uploadTime;
     private ArrayList<Resource> children;
 
@@ -42,4 +45,5 @@ public class Resource {
         this.uploadTime = new Date();
         this.children = children;
     }
+
 }

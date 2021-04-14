@@ -5,17 +5,18 @@ import cn.edu.njnu.opengms.userserver.common.JsonResult;
 import cn.edu.njnu.opengms.userserver.common.ResultUtils;
 import cn.edu.njnu.opengms.userserver.config.Md5PasswordEncoder;
 import cn.edu.njnu.opengms.userserver.dao.impl.UserDaoImpl;
-import cn.edu.njnu.opengms.userserver.entity.ClientDetails;
-import cn.edu.njnu.opengms.userserver.entity.Resource;
-import cn.edu.njnu.opengms.userserver.entity.User;
-import cn.edu.njnu.opengms.userserver.entity.VerificationCode;
+import cn.edu.njnu.opengms.userserver.entity.*;
 import cn.edu.njnu.opengms.userserver.service.UserService;
 import com.alibaba.fastjson.JSONObject;
 import org.omg.PortableInterceptor.INACTIVE;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeanWrapper;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
+import java.beans.PropertyDescriptor;
 import java.security.Principal;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -34,6 +35,38 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     CommonUtil commonUtil;
+
+    @Override
+    public JsonResult loginService(String email, String loginIp) {
+        User user = userDao.searchUser(email);
+        ArrayList<String> loginIp1 = user.getLoginIp();
+        //初始化 loginIp,
+        if (loginIp1 == null){
+            loginIp1 = new ArrayList<String>();
+        }
+        UserTo userTo = new UserTo();
+        String lastLoginIp = "";
+        /*
+        >=1则之前登录过，比对此次登录与上次登录是否地址一样
+        如果一样的话则不存，不同的话则存入
+         */
+        if (loginIp1.size() >= 1){
+            lastLoginIp = loginIp1.get(loginIp1.size() -1 );
+            //loginIp一致，直接返回
+            if (loginIp.equals(lastLoginIp)){
+                BeanUtils.copyProperties(user, userTo);
+                return ResultUtils.success(userTo);
+            }
+        }
+        //不一致，存入，采用更新
+        loginIp1.add(loginIp);
+        HashMap<String, Object> updateInfo = new HashMap<>();
+        updateInfo.put("loginIp", loginIp1);
+        Update update = commonUtil.setUpdate(updateInfo);
+        userDao.updateInfo(email, update);
+        BeanUtils.copyProperties(user, userTo);
+        return ResultUtils.success(user);
+    }
 
     @Override
     public JsonResult getUserInfo(String email) {
@@ -237,7 +270,9 @@ public class UserServiceImpl implements UserService {
         //     return userDao.updateInfo(email, update);
         // }
         //不是根节点情况，需要按深度遍历获得父节点，然后将其 push 到父节点的 children 节点中
-        upRes.setChildren(new ArrayList<Resource>());
+        if (upRes.getChildren() == null || upRes.getChildren().size() == 0){
+            upRes.setChildren(new ArrayList<Resource>());
+        }
         ArrayList<Resource> uploadedRes = aRes(paths, userRes, upRes, "0");
         updateInfoMap.put("resource", uploadedRes);
         Update update = commonUtil.setUpdate(updateInfoMap);
@@ -332,9 +367,11 @@ public class UserServiceImpl implements UserService {
             for (int j = 0; j < userRes.size(); j++) {
                 Resource resource = userRes.get(j);
                 if (resource.getUid().equals(putResUid)) {
-                    //将原来位置内容替换为新的内容
+                    //支持增量更新
                     userRes.remove(j);
-                    userRes.add(j, putRes);
+                    String[] nullPropertyNames = getNullPropertyNames(putRes);
+                    BeanUtils.copyProperties(putRes, resource, nullPropertyNames);
+                    userRes.add(j, resource);
                 }
             }
         } else {
@@ -485,8 +522,13 @@ public class UserServiceImpl implements UserService {
             Resource resource = uRes.get(i);
             if (resource.getUid().equals(uid)) {
                 uRes.remove(i);
+                break;
             } else {
-                dByUid(resource.getChildren(), uid);
+                if (resource.getFolder()){
+                    dByUid(resource.getChildren(), uid);
+                }else {
+                    continue;
+                }
             }
         }
         return uRes;
@@ -507,16 +549,48 @@ public class UserServiceImpl implements UserService {
     }
 
     private ArrayList<Resource> pResByUid(ArrayList<Resource> uRes, Resource res, String uid) {
-        for (int i = 0; i < uRes.size(); i++) {
-            Resource resource = uRes.get(i);
-            if (resource.getUid().equals(uid)) {
-                uRes.remove(i);
-                uRes.add(i, res);
-            } else {
-                pResByUid(resource.getChildren(), res, uid);
+        if (uRes != null || uRes.size() != 0) {
+            for (int i = 0; i < uRes.size(); i++) {
+                Resource resource = uRes.get(i);
+                if (resource.getUid().equals(uid)) {
+                    uRes.remove(i);
+                    String[] nullPropertyNames = getNullPropertyNames(res);
+                    BeanUtils.copyProperties(res, resource, nullPropertyNames);
+                    uRes.add(i, resource);
+                    //查询到结束
+                    break;
+                } else {
+                    //如果是文件夹再往底层搜索，如果是资源的话就不用往底层搜索了
+                    if (resource.getFolder()){
+                        pResByUid(resource.getChildren(), res, uid);
+                    }else {
+                        continue;
+                    }
+                }
             }
         }
         return uRes;
+    }
+
+    /**
+    * @Author zhngzhng
+    * @Description 提取对象空字段
+    * @Param [source]
+    * @Date 2021/4/9
+    */
+    private String[] getNullPropertyNames(Object source){
+        final BeanWrapper src = new  BeanWrapperImpl(source);
+        PropertyDescriptor[] pds = src.getPropertyDescriptors();
+
+        Set<String> emptyNames = new HashSet<>();
+        for (PropertyDescriptor pd: pds){
+            Object propertyValue = src.getPropertyValue(pd.getName());
+            if (propertyValue == null){
+                emptyNames.add(pd.getName());
+            }
+        }
+        String[] result = new String[emptyNames.size()];
+        return emptyNames.toArray(result);
     }
 
     /**
@@ -551,7 +625,7 @@ public class UserServiceImpl implements UserService {
         ArrayList<Resource> userRes = user.getResource();
         ArrayList<Resource> tempRes = new ArrayList<>();
         ArrayList<Resource> matchedRes = sResByKeyword(userRes, keyword, tempRes);
-        if (matchedRes.size() > 0){
+        if (matchedRes.size() > 0) {
             return ResultUtils.success(matchedRes);
         }
         return ResultUtils.noObject();
@@ -566,17 +640,17 @@ public class UserServiceImpl implements UserService {
                 Pattern pattern = Pattern.compile(keyword, Pattern.CASE_INSENSITIVE);
                 Matcher matcher = pattern.matcher(resource.getName());
                 //资源或文件夹都可以查询的
-                if (resource.getFolder()){
+                if (resource.getFolder()) {
                     //为文件夹时
-                    if (matcher.find()){
+                    if (matcher.find()) {
                         matchedRes.add(resource);
-                    }else {
+                    } else {
                         sResByKeyword(resource.getChildren(), keyword, matchedRes);
                     }
-                }else{
+                } else {
                     //为资源时
                     Matcher matcher1 = pattern.matcher(resource.getSuffix());
-                    if (matcher.find() || matcher1.find()){
+                    if (matcher.find() || matcher1.find()) {
                         matchedRes.add(resource);
                     }
                 }
@@ -584,5 +658,18 @@ public class UserServiceImpl implements UserService {
             return matchedRes;
         }
         return matchedRes;
+    }
+
+    @Override
+    public Object removeUserInDB(User user) {
+        String email = user.getEmail();
+        Integer code = userDao.findUserById(email).getCode();
+        if (code == -1){
+            userDao.moveInDb(user);
+            return 0;
+        }else if (code == 0){
+            return -1;
+        }
+        return -2;
     }
 }

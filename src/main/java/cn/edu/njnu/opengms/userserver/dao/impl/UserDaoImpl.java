@@ -61,6 +61,14 @@ public class UserDaoImpl implements UserDao {
         }
     }
 
+    @Override
+    public User searchUser(String id) {
+        Criteria criteria = new Criteria().orOperator(Criteria.where("userId").is(id),
+                Criteria.where("email").is(id));
+        Query query = new Query(criteria);
+        return mongoTemplate.findOne(query, User.class, COLLECTION_NAME);
+    }
+
     /**
      * Id 可以是 email 也可以是 userId
      *
@@ -157,5 +165,12 @@ public class UserDaoImpl implements UserDao {
     @Override
     public JsonResult addClient(ClientDetails client) {
         return ResultUtils.success(mongoTemplate.save(client));
+    }
+
+
+    @Override
+    public Integer moveInDb(User user) {
+        mongoTemplate.save(user);
+        return 1;
     }
 }

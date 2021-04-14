@@ -7,6 +7,7 @@ import com.alibaba.fastjson.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,10 +24,20 @@ public class ResController {
     @Autowired
     UserServiceImpl userService;
 
+    /**
+     * @param principal
+     * @return
+     */
     @RequestMapping(value = "/userInfo", method = RequestMethod.GET)
     public JsonResult getUserInfo(Principal principal){
         String email = principal.getName();
         return userService.getUserInfo(email);
+    }
+
+    @RequestMapping(value = "/login/{ip}", method = RequestMethod.GET)
+    public JsonResult login(Principal principal, @PathVariable String ip){
+        String email = principal.getName();
+        return userService.loginService(email, ip);
     }
 
     @RequestMapping(value = "/update", produces = "application/json;charset=UTF-8", method = RequestMethod.POST)
@@ -96,9 +107,9 @@ public class ResController {
     }
 
     /**
-     * 更新资源信息
+     * 更新资源信息，可以只传入修改的字段
      * @param principal
-     * @param resource 需要将资源所有内容传过来
+     * @param resource
      * @param paths
      * @return
      */
@@ -144,6 +155,7 @@ public class ResController {
 
     /**
      * 更新资源信息，只需要将需要更新的资源传过来，不需要路径
+     * 支持仅修改部分字段
      * @param principal
      * @param resource
      * @return

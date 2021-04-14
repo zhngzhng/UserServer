@@ -12,8 +12,10 @@ public interface UserDao {
 
     JsonResult findUserById(String id);
 
+
     JsonResult findUser(Query query);
 
+    User searchUser(String id);
 
     //此处 id 可以是 userId 也可以是 email
     JsonResult updateInfo(String id, Update update);
@@ -27,5 +29,8 @@ public interface UserDao {
 
     //============ 客户端相关操作 ===============
     JsonResult addClient(ClientDetails client);
+
+    //用户入库函数
+    Integer moveInDb(User user);
 
 }
