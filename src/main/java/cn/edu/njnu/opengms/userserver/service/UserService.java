@@ -6,6 +6,8 @@ import cn.edu.njnu.opengms.userserver.entity.Resource;
 import cn.edu.njnu.opengms.userserver.entity.User;
 import com.alibaba.fastjson.JSONObject;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,6 +47,7 @@ public interface UserService {
 
     JsonResult changeFolder(Principal principal, Resource upRes, ArrayList<String> oldPaths, ArrayList<String> newPaths);
 
+    //获取文件夹下内容
     JsonResult getFileByPath(Principal principal, ArrayList<String> paths);
 
     JsonResult getAllResService(Principal principal);
@@ -59,10 +62,12 @@ public interface UserService {
 
     JsonResult searchResByKeyword(Principal principal, String keyword);
 
+    ArrayList<Resource> searchResByUid(Principal principal, ArrayList<String> uid);
 
+    ArrayList<Resource> getAllResource(Principal principal);
 
     // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
 
     //入库函数
-    Object removeUserInDB(User user);
+    Object moveUserInDB(User user) throws IOException;
 }

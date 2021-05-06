@@ -173,4 +173,10 @@ public class UserDaoImpl implements UserDao {
         mongoTemplate.save(user);
         return 1;
     }
+
+    @Override
+    public User queryUserByEmail(String email) {
+        Query query = new Query(Criteria.where("email").is(email));
+        return mongoTemplate.findOne(query, User.class);
+    }
 }

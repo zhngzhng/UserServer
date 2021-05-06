@@ -1,6 +1,7 @@
 package cn.edu.njnu.opengms.userserver.controller;
 
 import cn.edu.njnu.opengms.userserver.common.JsonResult;
+import cn.edu.njnu.opengms.userserver.common.ResultUtils;
 import cn.edu.njnu.opengms.userserver.entity.Resource;
 import cn.edu.njnu.opengms.userserver.service.impl.UserServiceImpl;
 import com.alibaba.fastjson.JSONObject;
@@ -76,7 +77,7 @@ public class ResController {
      * @return
      */
     @RequestMapping(value = "/res", method = RequestMethod.GET)
-    public JsonResult getAllFile(Principal principal){
+    public JsonResult getAllRes(Principal principal){
         return userService.getAllResService(principal);
     }
 
@@ -87,7 +88,7 @@ public class ResController {
      * @param paths 由内到外写，
      * @return
      */
-    @RequestMapping(value = "/res/{paths}", method = RequestMethod.POST)
+    @RequestMapping(value = "/res/{paths}", method = RequestMethod.POST, produces = {"application/json;charset=UTF-8"})
     public JsonResult uploadRes(Principal principal, @RequestBody Resource resource, @PathVariable ArrayList<String> paths){
         return userService.addRes(principal, resource, paths);
     }
@@ -184,5 +185,22 @@ public class ResController {
         return userService.searchResByKeyword(principal, keyword);
     }
 
+    /**
+     * 根据 id 查询内容,多个内容
+     * @param principal
+     * @param uid
+     * @return
+     */
+    @RequestMapping(value = "/res/s/{uid}", method = RequestMethod.GET)
+    public JsonResult getResByUid(Principal principal, @PathVariable ArrayList<String> uid){
+        ArrayList<Resource> fileList = userService.searchResByUid(principal, uid);
+        return ResultUtils.success(fileList);
+    }
+
+    @RequestMapping(value = "/res/file/all", method = RequestMethod.GET)
+    public JsonResult getAllFileList(Principal principal){
+        ArrayList<Resource> allResource = userService.getAllResource(principal);
+        return ResultUtils.success(allResource);
+    }
 
 }

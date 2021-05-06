@@ -33,4 +33,7 @@ public interface UserDao {
     //用户入库函数
     Integer moveInDb(User user);
 
+    //专用于用户入库
+    User queryUserByEmail(String email);
+
 }

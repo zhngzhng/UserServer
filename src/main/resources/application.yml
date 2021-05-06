@@ -3,19 +3,19 @@ server:
   servlet:
     context-path: /userServer
 
-logging:
-  level:
-    org:
-      springframework:
-        security: DEBUG
+#logging:
+#  level:
+#    org:
+#      springframework:
+#        security: DEBUG
 spring:
   data:
     mongodb:
       uri: mongodb://localhost/userServer
   mail:
-    host: smtp.qq.com
-    username: zhengzhong2020@qq.com
-    password: gfombfgktdzkbdjj
+    host: smtp.163.com
+    username: geoproblemsolving@163.com
+    password: LYC123456
   #使用 jar 包方式进行部署存放文件需要映射jar外路径作为静态资源路径
   resources:
     static-locations: classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/,file:static/,file:./static/avatar

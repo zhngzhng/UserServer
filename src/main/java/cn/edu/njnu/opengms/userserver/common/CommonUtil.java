@@ -10,6 +10,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ResourceUtils;
 import sun.misc.BASE64Decoder;
+import sun.misc.REException;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.InternetAddress;
@@ -89,14 +90,14 @@ public class CommonUtil {
                         break;
                     //头像传输为 Base64,将 base64 转换为静态资源进行存储，然后将路径存储avatar字段中
                     case "avatar":
-                        if (value == null || value.equals("")){
+                        if (value == null || value.equals("")) {
                             continue;
                         }
                         String base64Str = "";
-                        String[] split = ((String)value).split(",");
-                        if (split.length == 2){
+                        String[] split = ((String) value).split(",");
+                        if (split.length == 2) {
                             base64Str = split[1];
-                        }else {
+                        } else {
                             base64Str = split[0];
                         }
                         //新建文件夹
@@ -137,6 +138,7 @@ public class CommonUtil {
     /**
      * 通过 paths 查找资源应该存在的位置
      * 找到父节点后直接在原文上修改得到内容
+     *
      * @param paths
      * @return
      */
@@ -146,5 +148,42 @@ public class CommonUtil {
         }
 
         return null;
+    }
+
+    public String avatarBase64ToPath(String avatarStr) {
+        String base64Str = "";
+        String[] split = avatarStr.split(",");
+        if (split.length == 2) {
+            base64Str = split[1];
+        } else {
+            base64Str = split[0];
+        }
+        try {
+            //新建文件夹
+            File path = new File(ResourceUtils.getURL("classpath:").getPath());
+            if (!path.exists()) {
+                path = new File("");
+            }
+            File avatarLocation = new File(path.getAbsolutePath(), "static/avatar/");
+            if (!avatarLocation.exists()) {
+                avatarLocation.mkdirs();
+            }
+            String avatarId = UUID.randomUUID().toString();
+            File avatar = new File(path.getAbsolutePath(), "static/avatar/" + avatarId + ".jpg");
+            byte[] avatarBytes = new BASE64Decoder().decodeBuffer(base64Str);
+            for (int i = 0; i < avatarBytes.length; i++) {
+                if (avatarBytes[i] < 0) {
+                    avatarBytes[i] += 256;
+                }
+            }
+            OutputStream out = new FileOutputStream(avatar);
+            out.write(avatarBytes);
+            out.flush();
+            out.close();
+
+            return "/avatar/" + avatarId + ".jpg";
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

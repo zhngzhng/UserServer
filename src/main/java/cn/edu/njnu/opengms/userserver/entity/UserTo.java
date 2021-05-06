@@ -28,4 +28,5 @@ public class UserTo {
     private String avatar;
     private String introduction;
     private ArrayList<String> domain;
+    private ArrayList<Resource> resource;
 }

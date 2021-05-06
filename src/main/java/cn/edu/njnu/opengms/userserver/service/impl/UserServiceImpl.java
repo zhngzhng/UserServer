@@ -15,9 +15,14 @@ import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ResourceUtils;
+import org.springframework.web.bind.annotation.RestController;
+import sun.misc.BASE64Decoder;
 
 import java.beans.PropertyDescriptor;
+import java.io.*;
 import java.security.Principal;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,7 +46,7 @@ public class UserServiceImpl implements UserService {
         User user = userDao.searchUser(email);
         ArrayList<String> loginIp1 = user.getLoginIp();
         //初始化 loginIp,
-        if (loginIp1 == null){
+        if (loginIp1 == null) {
             loginIp1 = new ArrayList<String>();
         }
         UserTo userTo = new UserTo();
@@ -50,10 +55,10 @@ public class UserServiceImpl implements UserService {
         >=1则之前登录过，比对此次登录与上次登录是否地址一样
         如果一样的话则不存，不同的话则存入
          */
-        if (loginIp1.size() >= 1){
-            lastLoginIp = loginIp1.get(loginIp1.size() -1 );
+        if (loginIp1.size() >= 1) {
+            lastLoginIp = loginIp1.get(loginIp1.size() - 1);
             //loginIp一致，直接返回
-            if (loginIp.equals(lastLoginIp)){
+            if (loginIp.equals(lastLoginIp)) {
                 BeanUtils.copyProperties(user, userTo);
                 return ResultUtils.success(userTo);
             }
@@ -270,7 +275,7 @@ public class UserServiceImpl implements UserService {
         //     return userDao.updateInfo(email, update);
         // }
         //不是根节点情况，需要按深度遍历获得父节点，然后将其 push 到父节点的 children 节点中
-        if (upRes.getChildren() == null || upRes.getChildren().size() == 0){
+        if (upRes.getChildren() == null || upRes.getChildren().size() == 0) {
             upRes.setChildren(new ArrayList<Resource>());
         }
         ArrayList<Resource> uploadedRes = aRes(paths, userRes, upRes, "0");
@@ -524,9 +529,9 @@ public class UserServiceImpl implements UserService {
                 uRes.remove(i);
                 break;
             } else {
-                if (resource.getFolder()){
+                if (resource.getFolder()) {
                     dByUid(resource.getChildren(), uid);
-                }else {
+                } else {
                     continue;
                 }
             }
@@ -561,9 +566,9 @@ public class UserServiceImpl implements UserService {
                     break;
                 } else {
                     //如果是文件夹再往底层搜索，如果是资源的话就不用往底层搜索了
-                    if (resource.getFolder()){
+                    if (resource.getFolder()) {
                         pResByUid(resource.getChildren(), res, uid);
-                    }else {
+                    } else {
                         continue;
                     }
                 }
@@ -573,19 +578,19 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-    * @Author zhngzhng
-    * @Description 提取对象空字段
-    * @Param [source]
-    * @Date 2021/4/9
-    */
-    private String[] getNullPropertyNames(Object source){
-        final BeanWrapper src = new  BeanWrapperImpl(source);
+     * @Author zhngzhng
+     * @Description 提取对象空字段
+     * @Param [source]
+     * @Date 2021/4/9
+     */
+    private String[] getNullPropertyNames(Object source) {
+        final BeanWrapper src = new BeanWrapperImpl(source);
         PropertyDescriptor[] pds = src.getPropertyDescriptors();
 
         Set<String> emptyNames = new HashSet<>();
-        for (PropertyDescriptor pd: pds){
+        for (PropertyDescriptor pd : pds) {
             Object propertyValue = src.getPropertyValue(pd.getName());
-            if (propertyValue == null){
+            if (propertyValue == null) {
                 emptyNames.add(pd.getName());
             }
         }
@@ -660,16 +665,186 @@ public class UserServiceImpl implements UserService {
         return matchedRes;
     }
 
+
     @Override
-    public Object removeUserInDB(User user) {
-        String email = user.getEmail();
-        Integer code = userDao.findUserById(email).getCode();
-        if (code == -1){
-            userDao.moveInDb(user);
-            return 0;
-        }else if (code == 0){
-            return -1;
+    public ArrayList<Resource> searchResByUid(Principal principal, ArrayList<String> uids) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        ArrayList<Resource> fileList = new ArrayList<>();
+        for (String uid : uids) {
+            Resource resource = sResByUid(userRes, uid, new Resource());
+            fileList.add(resource);
         }
-        return -2;
+        return fileList;
     }
+
+    private Resource sResByUid(ArrayList<Resource> userRes, String uid, Resource resource) {
+        //等于空停止或值查找到就结束
+        if (userRes.size() != 0) {
+            for (Resource item : userRes) {
+                if (item.getFolder()) {
+                    sResByUid(item.getChildren(), uid, resource);
+                } else {
+                    if (item.getUid().equals(uid)) {
+                        BeanUtils.copyProperties(item, resource);
+                        return item;
+                    }
+                }
+            }
+        }
+        return resource;
+    }
+
+    @Override
+    public ArrayList<Resource> getAllResource(Principal principal) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        ArrayList<Resource> userRes = user.getResource();
+        //递归将所有资源拿出来,初始化一个空的ArrayList传到递归函数用于存储
+        ArrayList<Resource> fileList = new ArrayList<>();
+        return gAllResource(userRes, fileList);
+    }
+
+    private ArrayList<Resource> gAllResource(ArrayList<Resource> userResList, ArrayList<Resource> fileList) {
+        if (userResList.size() != 0) {
+            for (Resource res : userResList) {
+                if (res.getFolder()) {
+                    gAllResource(res.getChildren(), fileList);
+                } else {
+                    fileList.add(res);
+                }
+            }
+        }
+        return fileList;
+    }
+
+    @Override
+    public Object moveUserInDB(User user) {
+        String email = user.getEmail();
+        /*
+        email 是唯一标识符，通过 email判断是否重复
+        冲突处理原则：先入库优先级高
+        1.基础字段中有内容字段保持原内容不变，字段为空情况使用后入库补充
+            补充：
+            字段类型为数组情况，使用并方式处理
+            avatar 传 base64字符串过来，用户服务器转为图片进行存储，avatar 字段存储图片在用户服务器中的地址
+            title 不一样的话，选级别高的存入
+        2.资源处理方式
+            参与式平台这边由于之前无文件夹结构，直接将用户资源全部转入My Data
+            门户那边资源按照文件夹结构迁移过来，资源有重复的话也无所谓（唯一标识符不一样）
+        3.密码问题
+            采用门户那边的加密方式（md5+sha256），参与式平台用户全部需要修改密码
+         */
+        User localUser = userDao.queryUserByEmail(email);
+        //无此用户
+        if (localUser == null) {
+            String avatarStr = user.getAvatar();
+            if (avatarStr != null) {
+                if (!avatarStr.equals("")) {
+                    CommonUtil commonUtil = new CommonUtil();
+                    String avatarPath = commonUtil.avatarBase64ToPath(avatarStr);
+                    user.setAvatar(avatarPath);
+                }
+            }
+            ArrayList<Resource> resource = user.getResource();
+            ArrayList<Resource> rootList = new ArrayList<>();
+            //如果资源为空，则新建一个 My data 文件夹给他
+            if (resource == null || resource.size() == 0) {
+                Resource defaultFolder = new Resource();
+                defaultFolder.setUid(UUID.randomUUID().toString());
+                defaultFolder.setName("My data");
+                defaultFolder.setFolder(true);
+                defaultFolder.setPrivacy("public");
+                defaultFolder.setParent("0");
+                rootList.add(defaultFolder);
+                user.setResource(rootList);
+            }
+            //有资源的话，直接存入即可了
+            // else {
+                /*
+                如果有资源的话，新建 portalResource 文件夹，将内容放进去
+                徒增工作量
+                 */
+            // Resource portalResource = new Resource();
+            // portalResource.setUid(UUID.randomUUID().toString());
+            // portalResource.setName("portalResource");
+            // portalResource.setFolder(true);
+            // portalResource.setPrivacy("public");
+            // portalResource.setParent("0");
+            // portalResource.setChildren(resource);
+            // rootList.add(portalResource);
+            // }
+
+
+        } else {
+            //库中已经有此用户,localUser至少都有一个My data 文件夹
+            ArrayList<Resource> portalResource = user.getResource();
+            ArrayList<Resource> localUserResource = localUser.getResource();
+            //将本地用户非空字段赋值给后导入的用户, resources已经被覆盖,password不覆盖，使用门户的密码
+            String[] nullPropertyNames = getUserNullPropertyNames(localUser);
+            BeanUtils.copyProperties(localUser, user, nullPropertyNames);
+
+            //将本地用户 resource 添加到后导入的用户的resourceList中
+            if (portalResource == null || portalResource.size() == 0) {
+                portalResource = new ArrayList<Resource>();
+            }
+            for (Resource res : localUserResource) {
+                portalResource.add(res);
+            }
+            user.setResource(portalResource);
+            //头像也得单独处理
+            String localUserAvatar = localUser.getAvatar();
+            String portalUserAvatar = user.getAvatar();
+
+            //本地用户avatar为空或""并且后导入用户有头像（已经转为base64字符串了）
+            if (localUserAvatar == null || localUserAvatar.equals("")){
+                if (portalUserAvatar != null){
+                    if (!portalUserAvatar.equals("")){
+                        CommonUtil commonUtil = new CommonUtil();
+                        String avatarStr = commonUtil.avatarBase64ToPath(portalUserAvatar);
+                        user.setAvatar(avatarStr);
+                    }else {
+                        user.setAvatar(null);
+                    }
+                }
+            }
+        }
+        userDao.moveInDb(user);
+        return "suc";
+    }
+
+    private String[] getUserNullPropertyNames(Object source) {
+        final BeanWrapper src = new BeanWrapperImpl(source);
+        PropertyDescriptor[] pds = src.getPropertyDescriptors();
+
+        Set<String> emptyNames = new HashSet<>();
+        for (PropertyDescriptor pd : pds) {
+            Object propertyValue = src.getPropertyValue(pd.getName());
+            if (propertyValue == null) {
+                emptyNames.add(pd.getName());
+            }
+        }
+        //直接不添加 resource 内容
+        emptyNames.add("password");
+        String[] result = new String[emptyNames.size()];
+        return emptyNames.toArray(result);
+    }
+
+    public String gsmUserToUserServer(User user){
+        String avatar = user.getAvatar();
+        if (avatar != null &&  !avatar.equals("")){
+            String avatarUrl = commonUtil.avatarBase64ToPath(avatar);
+            user.setAvatar(avatarUrl);
+        }
+        if (avatar != null){
+            if (avatar.equals("")){
+                user.setAvatar(null);
+            }
+        }
+        userDao.moveInDb(user);
+        return "suc";
+    }
+
+
 }
