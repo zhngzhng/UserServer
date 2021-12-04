@@ -4,11 +4,9 @@ import cn.edu.njnu.opengms.userserver.common.JsonResult;
 import cn.edu.njnu.opengms.userserver.common.ResultUtils;
 import cn.edu.njnu.opengms.userserver.entity.Resource;
 import cn.edu.njnu.opengms.userserver.service.impl.UserServiceImpl;
-import com.alibaba.fastjson.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -83,6 +81,7 @@ public class ResController {
 
     /**
      * 上传资源/新建文件夹
+     * 再添加一次容量
      * @param principal
      * @param resource
      * @param paths 由内到外写，
@@ -105,6 +104,25 @@ public class ResController {
                              @PathVariable("uid") String uid,
                              @PathVariable("paths") ArrayList<String> paths){
         return userService.delRes(principal, uid, paths);
+    }
+
+    /**
+     * 删除资源，将需要删除的资源的 id 传过来即可
+     */
+    @RequestMapping(value = "/res/{uid}",method = RequestMethod.DELETE)
+    public JsonResult delResByUid(Principal principal, @PathVariable String uid){
+        return userService.delByUid(principal, uid);
+    }
+
+    /**
+     * 批量删除
+     * @param principal
+     * @param uids
+     * @return
+     */
+    @RequestMapping(value = "/res/batch/{uids}", method = RequestMethod.DELETE)
+    public JsonResult delResByUids(Principal principal, @PathVariable ArrayList<String> uids){
+        return userService.delByUids(principal, uids);
     }
 
     /**
@@ -166,13 +184,9 @@ public class ResController {
         return userService.putByUid(principal, resource);
     }
 
-    /**
-     * 删除资源，将需要删除的资源的 id 传过来即可
-     */
-    @RequestMapping(value = "/res/{uid}",method = RequestMethod.DELETE)
-    public JsonResult delResByUid(Principal principal, @PathVariable String uid){
-        return userService.delByUid(principal, uid);
-    }
+
+
+
     
     /**
     * @Author zhngzhng
@@ -201,6 +215,51 @@ public class ResController {
     public JsonResult getAllFileList(Principal principal){
         ArrayList<Resource> allResource = userService.getAllResource(principal);
         return ResultUtils.success(allResource);
+    }
+
+    /**
+     * 上传文件预检接口
+     * 检查是否有空间
+     * 9223372036854775807
+     * @param principal
+     * @param size
+     * @return
+     */
+    @RequestMapping(value = "/res/upload/{size}", method = RequestMethod.GET)
+    public JsonResult checkFileCanBeUpload(Principal principal, @PathVariable long size){
+        HashMap<String, String> uploadMap = userService.hasCapacity(principal, size);
+        String canUpload = uploadMap.get("canUpload");
+        if (canUpload.equals("false")){
+            return ResultUtils.error(-2, uploadMap.get("remainCapacity"));
+        }
+        return ResultUtils.success(uploadMap);
+    }
+
+    /**
+     * 获取用户空间
+     * 返回两个字段
+     * usedCapacity
+     * capacity
+     * @param principal
+     * @return
+     */
+    @RequestMapping(value = "/res/capacity", method = RequestMethod.GET)
+    public JsonResult getUserCapacity(Principal principal){
+        HashMap<String, Long> userCapacity = userService.getUserCapacity(principal);
+        return ResultUtils.success(userCapacity);
+    }
+
+    /**
+     * 删除上传标记
+     * 用于上传失败后将容量复原
+     * 上传成功不用处理
+     * @param principal
+     * @param id
+     * @return
+     */
+    @RequestMapping(value = "/res/uploadFlag/{id}", method = RequestMethod.GET)
+    public JsonResult delUploadFlag(Principal principal, @PathVariable String id){
+        return userService.uploadFlag(principal, id);
     }
 
 }

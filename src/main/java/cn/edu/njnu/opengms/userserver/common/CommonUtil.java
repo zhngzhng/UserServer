@@ -86,31 +86,41 @@ public class CommonUtil {
                     case "organizations":
                     case "loginIp":
                     case "resource":
+                    case "capacity":
+                    case "usedCapacity":
                         update.set(key, value);
                         break;
                     //头像传输为 Base64,将 base64 转换为静态资源进行存储，然后将路径存储avatar字段中
                     case "avatar":
                         if (value == null || value.equals("")) {
+                            //删除头像
+                            update.set(key, "");
                             continue;
                         }
                         String base64Str = "";
+                        String suffix = "";
                         String[] split = ((String) value).split(",");
                         if (split.length == 2) {
+                            suffix = split[0].split("image/")[1].split(";")[0];
                             base64Str = split[1];
                         } else {
                             base64Str = split[0];
                         }
-                        //新建文件夹
+                        //class 文件夹存在
                         File path = new File(ResourceUtils.getURL("classpath:").getPath());
                         if (!path.exists()) {
                             path = new File("");
                         }
+                        //存放头像的文件夹
                         File avatarLocation = new File(path.getAbsolutePath(), "static/avatar/");
                         if (!avatarLocation.exists()) {
                             avatarLocation.mkdirs();
                         }
                         String avatarId = UUID.randomUUID().toString();
-                        File avatar = new File(path.getAbsolutePath(), "static/avatar/" + avatarId + ".jpg");
+                        suffix = suffix.equals("") ? "jpg": suffix;
+                        String avatarUrl = "/avatar/" + avatarId + "." + suffix;
+                        //新建头像
+                        File avatar = new File(path.getAbsolutePath() + "/static", avatarUrl);
                         byte[] avatarBytes = new BASE64Decoder().decodeBuffer(base64Str);
                         for (int i = 0; i < avatarBytes.length; i++) {
                             if (avatarBytes[i] < 0) {
@@ -122,7 +132,7 @@ public class CommonUtil {
                         out.flush();
                         out.close();
 
-                        update.set(key, "/avatar/" + avatarId + ".jpg");
+                        update.set(key, avatarUrl);
                         break;
                     default:
                         update.set(key, (String) value);

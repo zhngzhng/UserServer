@@ -2,7 +2,6 @@ server:
   port: 8088
   servlet:
     context-path: /userServer
-
 #logging:
 #  level:
 #    org:
@@ -11,7 +10,10 @@ server:
 spring:
   data:
     mongodb:
-      uri: mongodb://localhost/userServer
+        uri: mongodb://opengms:OpenGMS2018*Collaboration@94.191.49.160:27110/userServer?authSource=userServer
+#mongodb://opengms:OpenGMS2018*Collaboration@94.191.49.160:27110/userServer?authSource=userServer
+#mongodb://172.21.212.103:27017/userServer
+#mongodb://localhost:27017/userServer
   mail:
     host: smtp.163.com
     username: geoproblemsolving@163.com

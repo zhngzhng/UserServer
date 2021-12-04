@@ -5,12 +5,15 @@ import cn.edu.njnu.opengms.userserver.entity.ClientDetails;
 import cn.edu.njnu.opengms.userserver.entity.Resource;
 import cn.edu.njnu.opengms.userserver.entity.User;
 import com.alibaba.fastjson.JSONObject;
+import org.joda.time.LocalDate;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.TreeMap;
 
 public interface UserService {
     JsonResult getUserInfo(String email);
@@ -56,6 +59,8 @@ public interface UserService {
 
     JsonResult delByUid(Principal principal, String uid);
 
+    JsonResult delByUids(Principal principal, ArrayList<String> uids);
+
     JsonResult putByUid(Principal principal, Resource res);
 
     JsonResult findResByField(Principal principal,  String field, String value);
@@ -66,8 +71,31 @@ public interface UserService {
 
     ArrayList<Resource> getAllResource(Principal principal);
 
+    HashMap<String, String> hasCapacity(Principal principal, long size);
+
+    HashMap<String, Long> getUserCapacity(Principal principal);
+
+    Object uploadFlag(Principal principal, String uploadingId);
+
     // JsonResult addFiles(Principal principal, Resource upRes, ArrayList<String> paths);
 
     //入库函数
     Object moveUserInDB(User user) throws IOException;
+
+    Object validEmailIsRegistered(String email);
+
+    JsonResult getAvatarUrl(String email);
+
+    JsonResult getUserTag(String userId);
+
+    JsonResult getUserTag(HashSet<String> userIds);
+
+    JsonResult getUserInfo(String email, String client, String secret);
+
+    JsonResult getUsersTag(HashSet<String> userIds);
+
+    Long userCount(String client, String secret);
+
+    TreeMap<LocalDate, Integer> userRegisterTime(String client, String secret);
+
 }

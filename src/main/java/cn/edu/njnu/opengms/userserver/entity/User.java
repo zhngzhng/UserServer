@@ -30,6 +30,9 @@ public class User {
     private ArrayList<String> organizations;
     //存静态文件路径，前端传送 string 的base64过来
     private String avatar;
+    //限制容量为 5G = 5368709120b
+    private long capacity;
+    private long usedCapacity;
     private String introduction;
     @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
     private Date createdTime;

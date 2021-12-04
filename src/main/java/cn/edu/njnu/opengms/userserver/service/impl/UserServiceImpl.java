@@ -4,10 +4,13 @@ import cn.edu.njnu.opengms.userserver.common.CommonUtil;
 import cn.edu.njnu.opengms.userserver.common.JsonResult;
 import cn.edu.njnu.opengms.userserver.common.ResultUtils;
 import cn.edu.njnu.opengms.userserver.config.Md5PasswordEncoder;
+import cn.edu.njnu.opengms.userserver.dao.UploadingRepository;
 import cn.edu.njnu.opengms.userserver.dao.impl.UserDaoImpl;
 import cn.edu.njnu.opengms.userserver.entity.*;
 import cn.edu.njnu.opengms.userserver.service.UserService;
 import com.alibaba.fastjson.JSONObject;
+import org.joda.time.DateTime;
+import org.joda.time.LocalDate;
 import org.omg.PortableInterceptor.INACTIVE;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeanWrapper;
@@ -21,6 +24,7 @@ import sun.misc.BASE64Decoder;
 
 import java.beans.PropertyDescriptor;
 import java.io.*;
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -40,6 +44,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     CommonUtil commonUtil;
+
+    @Autowired
+    UploadingRepository uploadingRepository;
 
     @Override
     public JsonResult loginService(String email, String loginIp) {
@@ -80,6 +87,33 @@ public class UserServiceImpl implements UserService {
             return jsonResult;
         }
         User user = (User) jsonResult.getData();
+        long usedCapacity = user.getUsedCapacity();
+
+        //检查是否有正在上传的任务
+        List<Uploading> uploadList = uploadingRepository.findByEmail(email);
+        //有任务
+        if (uploadList.size() > 0) {
+            boolean flag = false;
+            Date nowDate = new Date();
+            for (Uploading item : uploadList) {
+                Date date = item.getDate();
+                long threadTime = nowDate.getTime() - date.getTime();
+                if (threadTime / 1000 / 60 / 60 > 2) {
+                    usedCapacity -= item.getFileSize();
+                    if (usedCapacity < 0){
+                        usedCapacity = 0;
+                    }
+                    uploadingRepository.delete(item);
+                    flag = true;
+                }
+            }
+            //有修改则需要更新用户信息
+            if (flag) {
+                user.setUsedCapacity(usedCapacity);
+                userDao.saveUser(user);
+            }
+        }
+
         user.setPassword("");
         return ResultUtils.success(user);
     }
@@ -89,6 +123,16 @@ public class UserServiceImpl implements UserService {
         String email = principal.getName();
         Update update = commonUtil.setUpdate(updateInfo);
         return userDao.updateInfo(email, update);
+    }
+
+    @Override
+    public JsonResult getAvatarUrl(String email) {
+        JsonResult userResult = userDao.findUserById(email);
+        if (userResult.getCode() != 0) {
+            return userResult;
+        }
+        User user = (User) userResult.getData();
+        return ResultUtils.success(user.getAvatar());
     }
 
     // /**
@@ -151,6 +195,7 @@ public class UserServiceImpl implements UserService {
         Resource defaultFolder = new Resource(UUID.randomUUID().toString(), "My Data", true, "public", "0", new ArrayList<Resource>());
         res.add(defaultFolder);
         user.setResource(res);
+        user.setCapacity(5368709120L);
         return userDao.createUser(user);
     }
 
@@ -267,16 +312,19 @@ public class UserServiceImpl implements UserService {
         ArrayList<Resource> userRes = user.getResource();
         //初始化用于更新的内容 map
         HashMap<String, Object> updateInfoMap = new HashMap<>();
-        // 为根节点情况，直接 push 即可,此情况作为递归出口了
-        // if (paths.size() == 0) {
-        //     userRes.add(upRes);
-        //     updateInfoMap.put("resource", userRes);
-        //     Update update = commonUtil.setUpdate(updateInfoMap);
-        //     return userDao.updateInfo(email, update);
-        // }
         //不是根节点情况，需要按深度遍历获得父节点，然后将其 push 到父节点的 children 节点中
         if (upRes.getChildren() == null || upRes.getChildren().size() == 0) {
             upRes.setChildren(new ArrayList<Resource>());
+        }
+        //是文件，不是文件夹,则需要更新用户空间内容
+        if (!upRes.getFolder()) {
+            long usedCapacity = user.getUsedCapacity();
+            long capacity = user.getCapacity();
+            usedCapacity += upRes.getFileSize();
+            if (usedCapacity > capacity){
+                return ResultUtils.error(-2, "Beyond capacity");
+            }
+            updateInfoMap.put("usedCapacity", usedCapacity);
         }
         ArrayList<Resource> uploadedRes = aRes(paths, userRes, upRes, "0");
         updateInfoMap.put("resource", uploadedRes);
@@ -311,14 +359,22 @@ public class UserServiceImpl implements UserService {
         return userRes;
     }
 
+    //用于记录删除文件的大小，全局变量
+    long delResSize;
+
     @Override
     public JsonResult delRes(Principal principal, String uid, ArrayList<String> paths) {
         String email = principal.getName();
         User user = (User) userDao.findUserById(email).getData();
+        long usedCapacity = user.getUsedCapacity();
         ArrayList<Resource> userRes = user.getResource();
+        //先初始化为0
+        delResSize = 0;
         ArrayList<Resource> deletedRes = dRes(userRes, uid, paths);
         HashMap<String, Object> delInfoMap = new HashMap<>();
         delInfoMap.put("resource", deletedRes);
+        usedCapacity = usedCapacity - delResSize < 0 ? 0 : usedCapacity - delResSize;
+        delInfoMap.put("usedCapacity", usedCapacity);
         Update update = commonUtil.setUpdate(delInfoMap);
         return userDao.updateInfo(email, update);
     }
@@ -330,6 +386,7 @@ public class UserServiceImpl implements UserService {
             for (int j = 0; j < userRes.size(); j++) {
                 Resource resource = userRes.get(j);
                 if (resource.getUid().equals(uid)) {
+                    delResSize = resource.getFileSize();
                     userRes.remove(j);
                 }
             }
@@ -514,10 +571,14 @@ public class UserServiceImpl implements UserService {
     public JsonResult delByUid(Principal principal, String uid) {
         String email = principal.getName();
         User user = (User) userDao.findUserById(email).getData();
+        long usedCapacity = user.getUsedCapacity();
         ArrayList<Resource> userRes = user.getResource();
+        delResSize = 0;
         ArrayList<Resource> deletedRes = dByUid(userRes, uid);
         HashMap<String, Object> putInfoMap = new HashMap<>();
         putInfoMap.put("resource", deletedRes);
+        usedCapacity = usedCapacity - delResSize < 0 ? 0 : usedCapacity - delResSize;
+        putInfoMap.put("usedCapacity", usedCapacity);
         Update update = commonUtil.setUpdate(putInfoMap);
         return userDao.updateInfo(email, update);
     }
@@ -526,6 +587,7 @@ public class UserServiceImpl implements UserService {
         for (int i = 0; i < uRes.size(); i++) {
             Resource resource = uRes.get(i);
             if (resource.getUid().equals(uid)) {
+                delResSize = resource.getFileSize();
                 uRes.remove(i);
                 break;
             } else {
@@ -539,6 +601,49 @@ public class UserServiceImpl implements UserService {
         return uRes;
     }
 
+    /**
+     * 批量删除资源
+     *
+     * @param principal
+     * @param uids
+     * @return
+     */
+    @Override
+    public JsonResult delByUids(Principal principal, ArrayList<String> uids) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        long usedCapacity = user.getUsedCapacity();
+        ArrayList<Resource> resource = user.getResource();
+        delResSize = 0;
+        ArrayList<Resource> deletedRes = dByUids(resource, uids);
+        HashMap<String, Object> putInfoMap = new HashMap<>();
+        putInfoMap.put("resource", deletedRes);
+        usedCapacity = usedCapacity - delResSize < 0 ? 0 : usedCapacity - delResSize;
+        putInfoMap.put("usedCapacity", usedCapacity);
+        Update update = commonUtil.setUpdate(putInfoMap);
+        return userDao.updateInfo(email, update);
+    }
+
+    private ArrayList<Resource> dByUids(ArrayList<Resource> uRes, ArrayList<String> uids) {
+        if (uids.size() > 0) {
+            for (int i = uRes.size() - 1; i >= 0; i--) {
+                //这个resource只是指向了整个内容中的地址
+                Resource resource = uRes.get(i);
+                if (!resource.getFolder()) {
+                    String uid = resource.getUid();
+                    if (uids.contains(uid)) {
+                        //有此资源，然后移除并将id也移除
+                        delResSize += resource.getFileSize();
+                        uRes.remove(i);
+                        uids.remove(uid);
+                    }
+                } else {
+                    dByUids(resource.getChildren(), uids);
+                }
+            }
+        }
+        return uRes;
+    }
 
     @Override
     public JsonResult putByUid(Principal principal, Resource res) {
@@ -707,7 +812,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private ArrayList<Resource> gAllResource(ArrayList<Resource> userResList, ArrayList<Resource> fileList) {
-        if (userResList.size() != 0) {
+        if (userResList != null && userResList.size() != 0) {
             for (Resource res : userResList) {
                 if (res.getFolder()) {
                     gAllResource(res.getChildren(), fileList);
@@ -718,6 +823,10 @@ public class UserServiceImpl implements UserService {
         }
         return fileList;
     }
+
+
+    public static int noUser = 0;
+    public static int copyUser = 0;
 
     @Override
     public Object moveUserInDB(User user) {
@@ -775,42 +884,138 @@ public class UserServiceImpl implements UserService {
             // portalResource.setChildren(resource);
             // rootList.add(portalResource);
             // }
-
+            userDao.moveInDb(user);
+            System.out.println("No user:" + ++noUser);
 
         } else {
             //库中已经有此用户,localUser至少都有一个My data 文件夹
-            ArrayList<Resource> portalResource = user.getResource();
-            ArrayList<Resource> localUserResource = localUser.getResource();
+            // ArrayList<Resource> portalResource = user.getResource();
+            // ArrayList<Resource> localUserResource = localUser.getResource();
             //将本地用户非空字段赋值给后导入的用户, resources已经被覆盖,password不覆盖，使用门户的密码
-            String[] nullPropertyNames = getUserNullPropertyNames(localUser);
-            BeanUtils.copyProperties(localUser, user, nullPropertyNames);
-
-            //将本地用户 resource 添加到后导入的用户的resourceList中
-            if (portalResource == null || portalResource.size() == 0) {
-                portalResource = new ArrayList<Resource>();
+            String[] nullPropertyNames = getUserNullPropertyNames(user);
+            boolean flag = true;
+            ArrayList<String> tempList = new ArrayList<>();
+            tempList.add("userId");
+            for (String item : nullPropertyNames) {
+                if (item.equals("resource")) {
+                    flag = false;
+                }
+                tempList.add(item);
             }
-            for (Resource res : localUserResource) {
-                portalResource.add(res);
+            if (flag) {
+                tempList.add("resource");
             }
-            user.setResource(portalResource);
-            //头像也得单独处理
-            String localUserAvatar = localUser.getAvatar();
-            String portalUserAvatar = user.getAvatar();
+            String[] strings = tempList.toArray(new String[tempList.size()]);
+            BeanUtils.copyProperties(user, localUser, strings);
 
-            //本地用户avatar为空或""并且后导入用户有头像（已经转为base64字符串了）
-            if (localUserAvatar == null || localUserAvatar.equals("")){
-                if (portalUserAvatar != null){
-                    if (!portalUserAvatar.equals("")){
-                        CommonUtil commonUtil = new CommonUtil();
-                        String avatarStr = commonUtil.avatarBase64ToPath(portalUserAvatar);
-                        user.setAvatar(avatarStr);
-                    }else {
-                        user.setAvatar(null);
+            // BeanUtils.copyProperties(localUser, user, nullPropertyNames);
+            // BeanUtils.copyProperties(user, localUser, new String[]{"userId", "resource"});
+
+            ArrayList<Resource> userResource = user.getResource();
+            ArrayList<Resource> localResource = localUser.getResource();
+
+            ArrayList<Resource> localFileList = gAllResource(localResource, new ArrayList<Resource>());
+            if (userResource == null) {
+                userResource = new ArrayList<Resource>();
+            }
+            ArrayList<Resource> userFileList = gAllResource(userResource, new ArrayList<Resource>());
+
+            Resource defaultFolder = new Resource();
+            String rootFolderId = UUID.randomUUID().toString();
+            defaultFolder.setUid(rootFolderId);
+            defaultFolder.setName("My data");
+            defaultFolder.setFolder(true);
+            defaultFolder.setPrivacy("public");
+            defaultFolder.setParent("0");
+
+            if (localFileList.size() > 0) {
+                //    本地有资源
+                if (userFileList.size() > 0) {
+                    //用于存储本地有，门户用户没有的资源
+                    ArrayList<Resource> localFileListTemp = new ArrayList<>();
+
+                    for (Resource localFile : localFileList) {
+                        String address = localFile.getAddress();
+                        boolean existFlag = false;
+                        for (Resource userFile : userFileList) {
+                            if (userFile.getAddress().equals(address)) {
+                                existFlag = true;
+                                continue;
+                            }
+                        }
+                        if (!existFlag) {
+                            localFile.setParent(rootFolderId);
+                            localFileListTemp.add(localFile);
+                        }
                     }
+                    //将门户用户没有的资源放到默认文件夹中
+                    defaultFolder.setChildren(localFileListTemp);
+                    userResource.add(defaultFolder);
+                } else {
+                    //   门户用户没资源，本地有资源
+                    userResource = localResource;
+                }
+            } else {
+                //    本地没资源
+                if (userResource.size() == 0) {
+                    userResource.add(defaultFolder);
                 }
             }
+            localUser.setResource(userResource);
+            // ArrayList<Resource> localUserResource = localUser.getResource();
+            // ArrayList<Resource> userResource = user.getResource();
+            // if (userResource != null && userResource.size() >0){
+            //     for (Resource item: userResource){
+            //         localUserResource.add(item);
+            //     }
+            //     localUser.setResource(localUserResource);
+            // }
+            // ArrayList<Resource> rootList = new ArrayList<>();
+            // if (resource == null || resource.size() == 0) {
+            //     Resource defaultFolder = new Resource();
+            //     defaultFolder.setUid(UUID.randomUUID().toString());
+            //     defaultFolder.setName("My data");
+            //     defaultFolder.setFolder(true);
+            //     defaultFolder.setPrivacy("public");
+            //     defaultFolder.setParent("0");
+            //     rootList.add(defaultFolder);
+            //     localUser.setResource(rootList);
+            // }
+
+            //将本地用户 resource 添加到后导入的用户的 resourceList 中
+            // if (portalResource == null || portalResource.size() == 0) {
+            //     portalResource = new ArrayList<Resource>();
+            // }
+            // for (Resource res : localUserResource) {
+            //     portalResource.add(res);
+            // }
+            // user.setResource(portalResource);
+
+            //头像也得单独处理
+            String localUserAvatar = localUser.getAvatar();
+            // String portalUserAvatar = user.getAvatar();
+            if (localUserAvatar != null && !localUserAvatar.equals("")) {
+                CommonUtil commonUtil = new CommonUtil();
+                String avatarStr = commonUtil.avatarBase64ToPath(localUserAvatar);
+                localUser.setAvatar(avatarStr);
+            }
+
+            //本地用户avatar为空或""并且后导入用户有头像（已经转为base64字符串了）
+            // if (localUserAvatar == null || localUserAvatar.equals("")){
+            //     if (portalUserAvatar != null){
+            //         if (!portalUserAvatar.equals("")){
+            //             CommonUtil commonUtil = new CommonUtil();
+            //             String avatarStr = commonUtil.avatarBase64ToPath(portalUserAvatar);
+            //             user.setAvatar(avatarStr);
+            //         }else {
+            //             user.setAvatar(null);
+            //         }
+            //     }
+            // }
+            userDao.moveInDb(localUser);
+            System.out.println("Copy User:" + ++copyUser);
         }
-        userDao.moveInDb(user);
+
         return "suc";
     }
 
@@ -831,14 +1036,14 @@ public class UserServiceImpl implements UserService {
         return emptyNames.toArray(result);
     }
 
-    public String gsmUserToUserServer(User user){
+    public String gsmUserToUserServer(User user) {
         String avatar = user.getAvatar();
-        if (avatar != null &&  !avatar.equals("")){
+        if (avatar != null && !avatar.equals("")) {
             String avatarUrl = commonUtil.avatarBase64ToPath(avatar);
             user.setAvatar(avatarUrl);
         }
-        if (avatar != null){
-            if (avatar.equals("")){
+        if (avatar != null) {
+            if (avatar.equals("")) {
                 user.setAvatar(null);
             }
         }
@@ -846,5 +1051,222 @@ public class UserServiceImpl implements UserService {
         return "suc";
     }
 
+    @Override
+    public Integer validEmailIsRegistered(String email) {
+        JsonResult validUser = userDao.findUserById(email);
+        Integer code = validUser.getCode();
+        if (code == 0) {
+            return 1;
+        }
+        return 0;
+    }
 
+    @Override
+    public JsonResult getUserTag(String userId) {
+        JsonResult userById = userDao.findUserById(userId);
+        if (userById.getCode() != 0) {
+            return userById;
+        }
+        User user = (User) userById.getData();
+        ArrayList<String> domain = user.getDomain();
+        ArrayList<String> organizations = user.getOrganizations();
+        HashMap<String, ArrayList<String>> tagMap = new HashMap<>();
+        tagMap.put("domain", domain);
+        tagMap.put("organization", organizations);
+        return ResultUtils.success(tagMap);
+    }
+
+    @Override
+    public JsonResult getUserTag(HashSet<String> userIds) {
+        if (userIds.isEmpty()){
+            return ResultUtils.error(-2, "The set size is zero.");
+        }
+        Iterator<String> iterator = userIds.iterator();
+        HashSet<String> domainSet = new HashSet<>();
+        HashSet<String> orgSet = new HashSet<>();
+        while (iterator.hasNext()){
+            String userId = iterator.next();
+            User user = (User)userDao.findUserById(userId).getData();
+            ArrayList<String> domains = user.getDomain();
+            ArrayList<String> organizations = user.getOrganizations();
+            domains.forEach(domain ->{
+                domainSet.add(domain);
+            });
+            organizations.forEach(organization ->{
+                orgSet.add(organization);
+            });
+        }
+        HashMap<String, HashSet<String>> userTagMap = new HashMap<>();
+        userTagMap.put("domains", domainSet);
+        userTagMap.put("organizations", orgSet);
+        return ResultUtils.success(userTagMap);
+    }
+
+    @Override
+    public JsonResult getUsersTag(HashSet<String> userIds) {
+        if (userIds.isEmpty())  return ResultUtils.error(-2, "The set size is zero.");
+        Iterator<String> iterator = userIds.iterator();
+        HashMap<String, HashMap<String, ArrayList<String>>> userTagMap = new HashMap<>();
+        while (iterator.hasNext()){
+            String userId = iterator.next();
+            User user = (User)userDao.findUserById(userId).getData();
+            ArrayList<String> domain = user.getDomain();
+            ArrayList<String> organizations = user.getOrganizations();
+            HashMap<String, ArrayList<String>> tagMap = new HashMap<>();
+            tagMap.put("domain", domain);
+            tagMap.put("organization", organizations);
+            userTagMap.put(userId, tagMap);
+        }
+        return ResultUtils.success(userTagMap);
+    }
+
+    @Override
+    public JsonResult getUserInfo(String email, String clientId, String secret) {
+        ClientDetails client = userDao.getClient(clientId);
+        if (client != null && client.getClientSecret().equals(secret)) {
+            JsonResult userById = userDao.findUserById(email);
+            if (userById.getCode().equals(0)) {
+                User user = (User) userById.getData();
+                UserPortal userPortal = new UserPortal();
+                BeanUtils.copyProperties(user, userPortal);
+                return ResultUtils.success(userPortal);
+            } else if (userById.getCode().equals(-1)) {
+                return ResultUtils.noObject("invalid email");
+            }
+            return userById;
+        }
+        return ResultUtils.error(-2, "invalid client");
+    }
+
+    @Override
+    public Long userCount(String clientId, String secret) {
+        ClientDetails client = userDao.getClient(clientId);
+        if (client != null && client.getClientSecret().equals(secret)){
+            return userDao.userCount();
+        }
+        return null;
+    }
+
+    @Override
+    public TreeMap<LocalDate, Integer> userRegisterTime(String clientId, String secret) {
+        ClientDetails client = userDao.getClient(clientId);
+        if (client == null || !client.getClientSecret().equals(secret)) return null;
+        List<User> allUser = userDao.findAllUser();
+        TreeMap<LocalDate, Integer> dateIntegerHashMap = new TreeMap<>();
+        for (User user : allUser){
+            Date createdTime = user.getCreatedTime();
+            if (createdTime == null) continue;
+            LocalDate localDate = new LocalDate(new DateTime(createdTime));
+            Integer num = dateIntegerHashMap.get(localDate);
+            if (num == null) dateIntegerHashMap.put(localDate, 1);
+            else dateIntegerHashMap.put(localDate, num + 1);
+        }
+        return dateIntegerHashMap;
+    }
+
+    @Override
+    public HashMap<String, String> hasCapacity(Principal principal, long size) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        long capacity = user.getCapacity();
+        long usedCapacity = user.getUsedCapacity();
+        long tempSize = usedCapacity + size;
+        HashMap<String, String> uploadingMap = new HashMap<>();
+        if (tempSize < capacity) {
+            //可以上传
+            Uploading uploading = new Uploading();
+            String uploadingId = UUID.randomUUID().toString();
+            uploading.setId(uploadingId);
+            uploading.setEmail(email);
+            uploading.setDate(new Date());
+            uploading.setFileSize(size);
+            user.setUsedCapacity(tempSize);
+            userDao.saveUser(user);
+            uploadingRepository.save(uploading);
+            uploadingMap.put("canUpload", "true");
+            uploadingMap.put("uploadId", uploadingId);
+            uploadingMap.put("usedCapacity", tempSize + "");
+            uploadingMap.put("capacity", capacity + "");
+
+        } else {
+            uploadingMap.put("canUpload", "false");
+            uploadingMap.put("remainCapacity", capacity - usedCapacity + "");
+        }
+        return uploadingMap;
+    }
+
+    @Override
+    public HashMap<String, Long> getUserCapacity(Principal principal) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        long usedCapacity = user.getUsedCapacity();
+        //检查是否有正在上传的任务
+        List<Uploading> uploadList = uploadingRepository.findByEmail(email);
+        //删除过期任务
+        if (uploadList.size() > 0) {
+            boolean flag = false;
+            Date nowDate = new Date();
+            for (Uploading item : uploadList) {
+                Date date = item.getDate();
+                long threadTime = nowDate.getTime() - date.getTime();
+                if (threadTime / 1000 / 60 / 60 > 2) {
+                    usedCapacity -= item.getFileSize();
+                    if (usedCapacity < 0){
+                        usedCapacity = 0;
+                    }
+                    uploadingRepository.delete(item);
+                    flag = true;
+                }
+            }
+            if (flag) {
+                user.setUsedCapacity(usedCapacity);
+                userDao.saveUser(user);
+            }
+        }
+        long capacity = user.getCapacity();
+        HashMap<String, Long> hashMap = new HashMap<>();
+        hashMap.put("capacity", capacity);
+        hashMap.put("usedCapacity", usedCapacity);
+        return hashMap;
+    }
+
+    /**
+     * 将上传任务去除
+     *
+     * @param principal
+     * @param uploadingId
+     * @return
+     */
+    @Override
+    public JsonResult uploadFlag(Principal principal, String uploadingId) {
+        String email = principal.getName();
+        User user = (User) userDao.findUserById(email).getData();
+        long usedCapacity = user.getUsedCapacity();
+        Optional<Uploading> byId = uploadingRepository.findById(uploadingId);
+        if (byId.isPresent()) {
+            Uploading uploading = byId.get();
+            long fileSize = uploading.getFileSize();
+            usedCapacity -= fileSize;
+            if (usedCapacity < 0){
+                usedCapacity = 0;
+            }
+            user.setUsedCapacity(usedCapacity);
+            userDao.saveUser(user);
+            UserTo userTo = new UserTo();
+            BeanUtils.copyProperties(user, userTo);
+            return ResultUtils.success(userTo);
+        }
+        return ResultUtils.error(-2, "No such uploading cache.");
+    }
+
+    public void refreshUserCapacity() {
+        int index = 0;
+        List<User> allUser = userDao.findAllUser();
+        for (User user : allUser) {
+            user.setCapacity(5368709120L);
+            userDao.saveUser(user);
+            System.out.println(++index);
+        }
+
+    }
 }

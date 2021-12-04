@@ -179,4 +179,25 @@ public class UserDaoImpl implements UserDao {
         Query query = new Query(Criteria.where("email").is(email));
         return mongoTemplate.findOne(query, User.class);
     }
+
+
+    public ClientDetails getClient(String clientId){
+        Query query = new Query(Criteria.where("clientId").is(clientId));
+        return mongoTemplate.findOne(query, ClientDetails.class);
+    }
+
+    public long userCount(){
+        Query query = new Query();
+        return mongoTemplate.count(query, User.class);
+    }
+
+    @Override
+    public User saveUser(User user) {
+        return mongoTemplate.save(user);
+    }
+
+    @Override
+    public List<User> findAllUser() {
+        return mongoTemplate.findAll(User.class);
+    }
 }

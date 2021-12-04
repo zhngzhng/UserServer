@@ -41,7 +41,7 @@ public class Resource {
     如果使用几大基本类型的话，默认值可能带来影响
     还是改成 String 好了，也好显示什么的
     */
-    private String fileSize;
+    private long fileSize;
     //存储父资源的 uuid
     private String parent;
     private String md5;

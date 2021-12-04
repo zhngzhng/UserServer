@@ -7,6 +7,8 @@ import cn.edu.njnu.opengms.userserver.entity.VerificationCode;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+import java.util.List;
+
 public interface UserDao {
     JsonResult createUser(User user);
 
@@ -35,5 +37,9 @@ public interface UserDao {
 
     //专用于用户入库
     User queryUserByEmail(String email);
+
+    User saveUser(User user);
+
+    List<User> findAllUser();
 
 }
